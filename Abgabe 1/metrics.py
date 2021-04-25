@@ -5,38 +5,72 @@ import os
 import subprocess
 from math import pi
 
+
+def get_minimum_of_line(workmatrix, line):
+    min_val = workmatrix[line][1]
+    pos = 1
+    for y in range(len(workmatrix[line])):
+        if workmatrix[line][y] <= min_val:
+            min_val = workmatrix[line][y]
+            pos = y
+    return pos
+
+
 # TODO REQ Beim Levenstein-Distanz fehlt noch auszugeben, welche Einfügungen,
 # Auslassungen und Ersetzungen der Programm in einem beliebig wählbaren Satz
 # vorgenommen hat, um eine minimale Distanz zu erhalten.
 # function to compute the levenshtein distance
-def levenshtein_distance(string1, string2):
+def levenshtein_distance(string1, string2, output):
     str1 = string1.split(" ")
     str2 = string2.split(" ")
+    # initialise matrix structure
     workmatrix = [[0 for x in range(len(str2) + 1)] for x in range(len(str1) + 1)]
     workmatrix[0][0] = 0
+    for i in range(0, len(str1) + 1):
+        workmatrix[i][0] = i
+    workmatrix[0][:] = range(0, len(str2) + 1)
 
-    # iteratively compute the cells of the workmatrix
-    # ecaluates the distance in the final cell of the matrix
-    for x in range(len(str1) + 1):
-        for y in range(len(str2) + 1):
-            if x == 0 and y == 0:  # skip first matrix cell
-                continue
-            elif x == 0:  # first column
-                workmatrix[x][y] = workmatrix[x][y - 1] + 1
-            elif y == 0:  # first row
-                workmatrix[x][y] = workmatrix[x - 1][y] + 1
-            elif str1[x - 1] == str2[y - 1]:  # preserve value if sequences are aligned
+    # calculates the distance in the final cell of the matrix
+    for x in range(1, len(str1) + 1):
+        for y in range(1, len(str2) + 1):
+            if str1[x - 1] == str2[y - 1]:  # preserve value if sequences are aligned
                 workmatrix[x][y] = workmatrix[x - 1][y - 1]
-            else:  # get minimum of  (substitution       , insertion         , deletion          )
-                workmatrix[x][y] = (
-                    min(
-                        workmatrix[x - 1][y - 1],
-                        workmatrix[x][y - 1],
-                        workmatrix[x - 1][y],
-                    )
-                    + 1
+            else:  # get minimum of (substitution , insertion, deletion)
+                value = min(
+                    workmatrix[x - 1][y - 1],
+                    workmatrix[x][y - 1],
+                    workmatrix[x - 1][y],
                 )
+                workmatrix[x][y] = value + 1
 
+    deletions = 0
+    insertion = 0
+    operations = ""
+    last_min = 0
+
+    if output:
+        for x in range(1, len(str1) + 1):
+            min_pos = get_minimum_of_line(workmatrix, x)
+            op = ""
+            if x != 1:
+                if min_pos - last_min >= 1:
+                    min_pos = last_min + 1
+            if workmatrix[x - 1][min_pos - 1] == workmatrix[x][min_pos]:
+                op = "Match "
+            else:
+                op = "Substitution "
+            if min_pos - deletions + insertion > x and x == 1:
+                deletions += 1
+                operations += "Deletion " + op
+            elif min_pos - deletions + insertion < x and min_pos == len(str2):
+                insertion += 1
+                operations += "Insertion "
+            elif min_pos - deletions + insertion == x:
+                operations += op
+            last_min = min_pos
+        print(operations)
+    for row in workmatrix:
+        print(row)
     return workmatrix[len(str1)][len(str2)]  # value of final cell
 
 
@@ -151,7 +185,7 @@ def met_wer(datei1, datei2):
 
     # compute the sum over all reference-hypothesis pair
     for x in range(len(referenz)):
-        sum_leven_d += levenshtein_distance(referenz[x], hypothese[x])
+        sum_leven_d += levenshtein_distance(referenz[x], hypothese[x], False)
 
     return sum_leven_d / len(" ".join(referenz).split())
 
@@ -218,33 +252,34 @@ def value_counter():
 
 def main():
     # calculate first assignment
-    value_counter()
+    # value_counter()
     # calculate levenstein distance
     print(
         "L-Distance: ",
-        levenshtein_distance("ich dich dich dich dich", "ich dich dich jage dich"),
+        levenshtein_distance("b a n a n e", "a n a n a s", True),
     )
-    col_width = max(len(word) for word in sys.argv) + 2
-    table_matrix = [[]]
-    table_matrix.append(["FILE", "|", "PER", "|", "WER", "|", "BLEU"])
 
-    # construct the printable table
-    for file in sys.argv[1:]:
-        table_matrix.append(
-            [
-                file,
-                "|",
-                "{:0.4f}".format(met_per("newstest.en", file)),  # PER
-                "|",
-                "{:0.4f}".format(met_wer("newstest.en", file)),  # WER
-                "|",
-                "{:0.4f}".format(met_bleu("newstest.en", file, 4)),  # BLEU
-            ]
-        )
+    # col_width = max(len(word) for word in sys.argv) + 2
+    # table_matrix = [[]]
+    # table_matrix.append(["FILE", "|", "PER", "|", "WER", "|", "BLEU"])
+
+    # # construct the printable table
+    # for file in sys.argv[1:]:
+    #     table_matrix.append(
+    #         [
+    #             file,
+    #             "|",
+    #             "{:0.4f}".format(met_per("newstest.en", file)),  # PER
+    #             "|",
+    #             "{:0.4f}".format(met_wer("newstest.en", file)),  # WER
+    #             "|",
+    #             "{:0.4f}".format(met_bleu("newstest.en", file, 4)),  # BLEU
+    #         ]
+    #     )
 
     # print(table_matrix)
-    for row in table_matrix:
-        print("".join(word.ljust(col_width) for word in row))
+    # for row in table_matrix:
+    #     print("".join(word.ljust(col_width) for word in row))
 
 
 if __name__ == "__main__":
