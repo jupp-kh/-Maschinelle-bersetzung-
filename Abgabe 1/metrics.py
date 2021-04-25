@@ -43,34 +43,44 @@ def levenshtein_distance(string1, string2, output):
                 )
                 workmatrix[x][y] = value + 1
 
-    deletions = 0
-    insertion = 0
-    operations = ""
-    last_min = 0
+    if output == True:
+        moves = []
+        y = len(str2)
+        x = len(str1)
+        while x >= 0 and y >= 0:
+            if y == 0 and x == 0:
+                break
+            if y == 0 and x != 0:
+                x -= 1
+                moves.insert(0, "Insertion")
+                continue
+            if x == 0 and y != 0:
+                moves.insert(0, "Deletion")
+                y -= 1
+                continue
+            if (
+                workmatrix[x][y] == workmatrix[x - 1][y - 1]
+                and str1[x - 1] == str2[y - 1]
+            ):
+                moves.insert(0, "Match")
+                x -= 1
+                y -= 1
+            elif (
+                workmatrix[x][y] == workmatrix[x - 1][y - 1] + 1
+                and workmatrix[x - 1][y - 1] < workmatrix[x][y - 1]
+                and workmatrix[x - 1][y - 1] < workmatrix[x - 1][y]
+            ):
+                moves.insert(0, "Substitution")
+                x -= 1
+                y -= 1
+            elif workmatrix[x][y] == workmatrix[x - 1][y] + 1:
+                moves.insert(0, "Insertion")
+                x -= 1
+            elif workmatrix[x][y] == workmatrix[x][y - 1] + 1:
+                moves.insert(0, "Deletion")
+                y -= 1
+        print(moves)
 
-    if output:
-        for x in range(1, len(str1) + 1):
-            min_pos = get_minimum_of_line(workmatrix, x)
-            op = ""
-            if x != 1:
-                if min_pos - last_min >= 1:
-                    min_pos = last_min + 1
-            if workmatrix[x - 1][min_pos - 1] == workmatrix[x][min_pos]:
-                op = "Match "
-            else:
-                op = "Substitution "
-            if min_pos - deletions + insertion > x and x == 1:
-                deletions += 1
-                operations += "Deletion " + op
-            elif min_pos - deletions + insertion < x and min_pos == len(str2):
-                insertion += 1
-                operations += "Insertion "
-            elif min_pos - deletions + insertion == x:
-                operations += op
-            last_min = min_pos
-        print(operations)
-    for row in workmatrix:
-        print(row)
     return workmatrix[len(str1)][len(str2)]  # value of final cell
 
 
@@ -252,34 +262,35 @@ def value_counter():
 
 def main():
     # calculate first assignment
-    # value_counter()
+    value_counter()
+
     # calculate levenstein distance
     print(
         "L-Distance: ",
-        levenshtein_distance("b a n a n e", "a n a n a s", True),
+        levenshtein_distance("uz sa a n a n a s sasd awq", "n a n", True),
     )
 
-    # col_width = max(len(word) for word in sys.argv) + 2
-    # table_matrix = [[]]
-    # table_matrix.append(["FILE", "|", "PER", "|", "WER", "|", "BLEU"])
+    col_width = max(len(word) for word in sys.argv) + 2
+    table_matrix = [[]]
+    table_matrix.append(["FILE", "|", "PER", "|", "WER", "|", "BLEU"])
 
-    # # construct the printable table
-    # for file in sys.argv[1:]:
-    #     table_matrix.append(
-    #         [
-    #             file,
-    #             "|",
-    #             "{:0.4f}".format(met_per("newstest.en", file)),  # PER
-    #             "|",
-    #             "{:0.4f}".format(met_wer("newstest.en", file)),  # WER
-    #             "|",
-    #             "{:0.4f}".format(met_bleu("newstest.en", file, 4)),  # BLEU
-    #         ]
-    #     )
+    # construct the printable table
+    for file in sys.argv[1:]:
+        table_matrix.append(
+            [
+                file,
+                "|",
+                "{:0.4f}".format(met_per("newstest.en", file)),  # PER
+                "|",
+                "{:0.4f}".format(met_wer("newstest.en", file)),  # WER
+                "|",
+                "{:0.4f}".format(met_bleu("newstest.en", file, 4)),  # BLEU
+            ]
+        )
 
-    # print(table_matrix)
-    # for row in table_matrix:
-    #     print("".join(word.ljust(col_width) for word in row))
+    print(table_matrix)
+    for row in table_matrix:
+        print("".join(word.ljust(col_width) for word in row))
 
 
 if __name__ == "__main__":
