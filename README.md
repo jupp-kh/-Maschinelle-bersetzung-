@@ -33,4 +33,4 @@ In dieser Übungsblatt geht es darum die Metriken WER, PER und BLEU zu verstehen
 Ein Programm zu schreiben welches diese für eine gegebene Menge von Referenz-Hypothese Paaren berechnet. 
 Gemeint ist damit die Evaluation von Hypothesen durch den Vergleich mit einer oder mehreren Referenzenübersetzungen.
 
-#Aufgabe 2 - Vokabular und Subword Units
+# Aufgabe 2 - Vokabular und Subword Units
