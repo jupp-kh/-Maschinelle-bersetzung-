@@ -1,11 +1,24 @@
 # Maschinelle Übersetzung
 
+# Abgabetermine
+
+| Thema | Deadline |Abgabe commitNr| geschafft |
+| - | ----- | - | - |
+|Metriken|26.04|2e6ca3e0|:heavy_check_mark:|
+|Der byte pair enconding (BPE) |10.5|-|-|
+|Vokabular und Subword Units|-|-|-|
+|Feed Forward Netzwerke|-|-|-|
+|Suche|-|-|-|
+|Rekurrente Neuronale Netzwerke|-|-|-|
+|Blatt 6|-|-|-|
+
+
 # Vorlesungtermine 
 
 |Datum  |Thema    	|
 |-------|------   	|
 |13.04  |Metriken 	|  
-|27.04  |		|
+|27.04  |Vokabular und Subword Units|
 |04.05  |		|	
 |(!)    |		|
 |11.05  |		|
@@ -13,18 +26,6 @@
 |15.06  |		| 
 |06.07  |		|
 |20.07  |		|
-
-# Abgabetermine
-
-| Thema | Deadline |Abgabe commitNr| geschafft |
-| - | ----- | - | - |
-|Metriken|26.04|2e6ca3e0|:heavy_check_mark:|
-|Vokabular und Subword Units|-|-|-|
-|Feed Forward Netzwerke|-|-|-|
-|Suche|-|-|-|
-|Rekurrente Neuronale Netzwerke|-|-|-|
-|Blatt 6|-|-|-|
-
 
 
 # Aufgabe 1 - Metriken 
