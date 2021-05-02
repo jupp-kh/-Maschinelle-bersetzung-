@@ -1,6 +1,6 @@
 # Maschinelle Übersetzung
 
-# Abgabetermine
+## Abgabetermine
 
 | Thema | Deadline |Abgabe commitNr| geschafft |
 | - | ----- | - | - |
@@ -13,7 +13,7 @@
 |Blatt 6|-|-|-|
 
 
-# Vorlesungtermine 
+## Vorlesungtermine 
 
 |Datum  |Thema    	|
 |-------|------   	|
@@ -28,16 +28,20 @@
 |20.07  |		|
 
 
-# Aufgabe 1 - Metriken 
+## Aufgabe 1 - Metriken 
 
 In dieser Übungsblatt geht es darum die Metriken WER, PER und BLEU zu verstehen
 Ein Programm zu schreiben welches diese für eine gegebene Menge von Referenz-Hypothese Paaren berechnet. 
 Gemeint ist damit die Evaluation von Hypothesen durch den Vergleich mit einer oder mehreren Referenzenübersetzungen.
 
-# Aufgabe 2 - Vokabular und Subword Units
+## Aufgabe 2 - Vokabular und Subword Units
 
 Auf dem zweiten Blatt geht es um die Implementierung des byte pair encoding algorithmus. Wir sollen ein Programm schreiben, das Folgendes kann:
     - anhand einer gegebenen Anzahl von Zusammenzug-Operationen sowie Trainingsdaten eine BPE Zerlegung zu lernen.
     - erlernte BPE Operationen auf Text anzuwenden.
     - die BPE Zerlegung rückgängig zu machen.
 Darüber hinaus erstellen wir eine Klasse Dictionary, die verwendet wird, um das Vokabular aus einem gegebenen Text/einer gegebenen Datei zu behalten. Der letzte Teil dieses Blattes beschäftigt sich mit der Weiterverarbeitung von Daten - dazu soll eine Funktion zur Erzeugung von "Batches" entwickelt werden.
+
+- [ ] BPE
+- [ ] Klasse Dictionary
+- [ ] Funktion Batch
