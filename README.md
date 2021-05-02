@@ -5,7 +5,7 @@
 | Thema | Deadline |Abgabe commitNr| geschafft |
 | - | ----- | - | - |
 |Metriken|26.04|2e6ca3e0|:heavy_check_mark:|
-|Der byte pair enconding (BPE) |10.5|-|-|
+|Der byte pair enconding (BPE) |10.05|-|-|
 |Vokabular und Subword Units|-|-|-|
 |Feed Forward Netzwerke|-|-|-|
 |Suche|-|-|-|
