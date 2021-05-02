@@ -6,16 +6,6 @@ import subprocess
 from math import pi
 
 
-def get_minimum_of_line(workmatrix, line):
-    min_val = workmatrix[line][1]
-    pos = 1
-    for y in range(len(workmatrix[line])):
-        if workmatrix[line][y] <= min_val:
-            min_val = workmatrix[line][y]
-            pos = y
-    return pos
-
-
 # TODO REQ Beim Levenstein-Distanz fehlt noch auszugeben, welche Einfügungen,
 # Auslassungen und Ersetzungen der Programm in einem beliebig wählbaren Satz
 # vorgenommen hat, um eine minimale Distanz zu erhalten.
@@ -85,8 +75,8 @@ def levenshtein_distance(string1, string2, output):
 
 
 # return the number of n grams
-def num_n_grams(referenz, hypothese):
-    ref = referenz.split(hypothese)
+def num_n_grams(reference, hypothesis):
+    ref = reference.split(hypothesis)
     return len(ref) - 1
 
 
@@ -103,11 +93,11 @@ def removeduplicate(lis):
 
 # helps calculate the numerator (zaehler) and denominator (nenner) for the bleu metric
 # returns the tuple (numerator, denominator)
-def bleu_num_denom(referenz, hypothese, n):
-    hypo_word = hypothese.split()
+def bleu_num_denom(reference, hypothesis, n):
+    hypo_word = hypothesis.split()
     n_gram_list = []
-    sumzaehler = 0
-    sumnenner = 0
+    sum_numerator = 0
+    sum_denominator = 0
 
     # pass all n-grams into the n-gram list
     for x in range(len(hypo_word) - n + 1):
@@ -115,16 +105,15 @@ def bleu_num_denom(referenz, hypothese, n):
         elem = [hypo_word[i] for i in range(x, x + n)]
         n_gram_list.append(elem) if elem not in n_gram_list else n_gram_list
 
-    # clear duplicates in list
-    n_gram_list = removeduplicate(n_gram_list)
-
     # calculate the denominator and numerator then return
     for x in n_gram_list:
-        sumzaehler += min(
-            num_n_grams(referenz, " ".join(x)), num_n_grams(hypothese, " ".join(x))
+        sum_numerator += min(
+            num_n_grams(reference, " ".join(x)), num_n_grams(hypothesis, " ".join(x))
         )
-        sumnenner += num_n_grams(hypothese, " ".join(x))
-    return (sumzaehler, sumnenner)
+        sum_denominator += num_n_grams(hypothesis, " ".join(x))
+    print(n_gram_list)
+    print(sum_numerator, sum_denominator)
+    return (sum_numerator, sum_denominator)
 
 
 # this method reads from file datei
@@ -144,16 +133,16 @@ def read_from_file(datei):
 def precision(reference, hypothese, n):
     if len(reference) != len(hypothese):
         raise Exception("Error: hypothesis and reference files have different lengths!")
-    zaehler = 0
-    nenner = 0
+    numerator = 0
+    denom = 0
 
     # calculate the numerator and denominator to compute the precision
     for x in range(len(reference)):
         fract = bleu_num_denom(reference[x], hypothese[x], n)
-        zaehler += fract[0]
-        nenner += fract[1]
+        numerator += fract[0]
+        denom += fract[1]
 
-    return zaehler / nenner
+    return numerator / denom
 
 
 # this function calculates the brevity penalty
@@ -183,7 +172,6 @@ def met_bleu(datei1, datei2, n):
     # get the brevity penalty
     bp = brevity_penalty(" ".join(referenz).split(), " ".join(hypothese).split())
 
-    # print("breveity penalty: ", bp, res)
     return bp * math.exp(res)
 
 
@@ -263,7 +251,6 @@ def value_counter():
 def main():
     # calculate first assignment
     value_counter()
-
     # calculate levenstein distance
     print(
         "L-Distance: ",
@@ -294,4 +281,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # main()
+    bleu_num_denom("the cat is on the mat ", "the the cat", 1)
