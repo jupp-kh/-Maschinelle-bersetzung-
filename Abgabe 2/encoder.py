@@ -45,40 +45,42 @@ class Table:
             print(elem[0], "       |    ", elem[1])
 
 
-def get_words(list_words):
+def get_words(lis_lines):
+    word_tab = Table()
+    lis_words = " ".join(lis_lines).split()
     for word in lis_words:
-        word_tab.update_pairs(word)
+        word_tab.update_pairs(" ".join(list(word)) + "</w>")
+    print(word_tab.tabular)
+    return word_tab
 
 
 def get_pairs(file):
     # number of operations needed for BDE
     op_number = [1000, 5000, 15000]
-
-    # list of lines in file and list of words in file
-    lis_lines = metrics.read_from_file(file)
-    lis_words = " ".join(lis_lines).split()
-
-    word_tab = get_words(lis_words)  # table of words in file
     op_sqnce = []  # sequence of operations
     char_list = []
 
+    # list of lines in file
+    lis_lines = metrics.read_from_file(file)
+    word_tab = get_words(lis_lines)  # table of words in file
+
     # iterate over
-    for key, value in word_tab.tabular.items():
-        # split word to letters and store in list
-        characs = list(key)
-        characs[len(characs) - 1] += "</w>"
-        char_list.append(characs)
+    # for key, value in word_tab.tabular.items():
+    #     # split word to letters and store in list
+    #     characs = list(key)
+    #     characs[len(characs) - 1] += "</w>"
+    #     char_list.append(characs)
 
-    for i in range(1000):
-        tmp_table = Table()  # temp structure
+    # for i in range(1000):
+    #     tmp_table = Table()  # temp structure
 
-        for characs in char_list:
-            for j in range(len(characs) - 1):
-                tup = characs[j] + characs[j + 1]
-                tmp_table.update_pairs(tup)
-                tmp_table.tabular[tup] += (
-                    word_tab.tabular[characs[: len(characs) - 4]] - 1
-                )
+    #     for characs in char_list:
+    #         for j in range(len(characs) - 1):
+    #             tup = characs[j] + characs[j + 1]
+    #             tmp_table.update_pairs(tup)
+    #             tmp_table.tabular[tup] += (
+    #                 word_tab.tabular[characs[: len(characs) - 4]] - 1
+    #             )
 
     return word_tab
 
