@@ -53,7 +53,19 @@ def get_words(lis_lines):
     lis_words = " ".join(lis_lines).split()
     for word in lis_words:
         word_tab.update_pairs(" ".join(list(word)) + "</w>")
+    print(len(word_tab.tabular))
     return word_tab
+
+
+def count_unk_word(word_tab):
+    """ count number of yet unknown words """
+    counter = 0
+    for key, val in word_tab.tabular.items():
+        if len(key.split()) == 1:
+            counter += 1
+    print(counter)
+    print(len(word_tab.tabular))
+    return counter
 
 
 #
@@ -62,27 +74,21 @@ def merge_sqnce(word_tab, max_pair):
     tmp_table = Table()
     for key, value in word_tab.tabular.items():
         hold_key = key.replace(max_pair, max_pair.replace(" ", ""))
-        # print(hold_key)
-        # time.sleep(2)
         tmp_table.tabular[hold_key] = value
 
     return tmp_table
 
 
-def get_pairs(file):
-    # number of operations needed for BDE
-    op_number = [1000, 5000, 15000]
+def get_pairs(file, n):
     op_sqnce = []  # sequence of operations
 
     # list of lines in file
     lis_lines = metrics.read_from_file(file)
     word_tab = get_words(lis_lines)  # table of words in file
 
-    for i in range(1000):
+    for i in range(n):
         tmp_table = Table()  # temp structure
 
-        if i % 100 == 0:
-            print(op_sqnce)
         # go through keys
         # count all occurrences of symbol pairs
         for key, value in word_tab.tabular.items():
@@ -101,11 +107,14 @@ def get_pairs(file):
         # merge new values to word table
         word_tab = merge_sqnce(word_tab, max_pair)
 
-    return word_tab
+    count_unk_word(word_tab)
+    return op_sqnce
 
 
 def main():
-    t = get_pairs("Abgabe 2/data_exercise_2/multi30k.de")
+    op_number = [1000, 5000, 15000]
+    for n in op_number:
+        get_pairs("Abgabe 2/data_exercise_2/multi30k.de", n)
     # print(t.tabular)
 
 
