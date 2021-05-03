@@ -76,7 +76,8 @@ def levenshtein_distance(string1, string2, output):
 
 # return the number of n grams
 def num_n_grams(reference, hypothesis):
-    ref = reference.split(hypothesis)
+    # split reference at n_gram occurrence
+    ref = (" " + reference + " ").split(" " + hypothesis + " ")
     return len(ref) - 1
 
 
@@ -111,8 +112,7 @@ def bleu_num_denom(reference, hypothesis, n):
             num_n_grams(reference, " ".join(x)), num_n_grams(hypothesis, " ".join(x))
         )
         sum_denominator += num_n_grams(hypothesis, " ".join(x))
-    print(n_gram_list)
-    print(sum_numerator, sum_denominator)
+
     return (sum_numerator, sum_denominator)
 
 
@@ -267,11 +267,19 @@ def main():
             [
                 file,
                 "|",
-                "{:0.4f}".format(met_per("newstest.en", file)),  # PER
+                "{:0.4f}".format(
+                    met_per("data_exercise_1/newstest.en", "data_exercise_1/" + file)
+                ),  # PER
                 "|",
-                "{:0.4f}".format(met_wer("newstest.en", file)),  # WER
+                "{:0.4f}".format(
+                    met_wer("data_exercise_1/newstest.en", "data_exercise_1/" + file)
+                ),  # WER
                 "|",
-                "{:0.4f}".format(met_bleu("newstest.en", file, 4)),  # BLEU
+                "{:0.4f}".format(
+                    met_bleu(
+                        "data_exercise_1/newstest.en", "data_exercise_1/" + file, 4
+                    )
+                ),  # BLEU
             ]
         )
 
@@ -281,5 +289,5 @@ def main():
 
 
 if __name__ == "__main__":
-    # main()
-    bleu_num_denom("the cat is on the mat ", "the the cat", 1)
+    main()
+    # bleu_num_denom("the cat is on the mat ", "the the cat", 1)
