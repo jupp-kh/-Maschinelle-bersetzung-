@@ -1,13 +1,15 @@
 import sys
 import metrics
 import subprocess
+import time
 
 
 class Table:
     """ Table saves the learned words """
 
     # List of pairs and their frequency
-    _pair_freq = {}  # dict
+    def __init__(self):
+        self._pair_freq = {}  # dict
 
     @property
     def tabular(self):
@@ -25,11 +27,11 @@ class Table:
         self._pair_freq.pop(symbol_pair)
 
     # returns highest pair
-    def save_highest_pair(self):
+    def get_highest_pair(self):
         # get max value - max(iterable object, lambda function)
         # lambda gives the value of each key i.e. the second item in tuple
         # val_list = []
-        return max(self._pair_freq.items(), key=lambda x: x[1])
+        return max(self._pair_freq.items(), key=lambda x: x[1])[0]
 
         # # find all occurences of max_val
         # for key, val in self._pair_freq.items():
@@ -45,48 +47,65 @@ class Table:
             print(elem[0], "       |    ", elem[1])
 
 
+#
 def get_words(lis_lines):
     word_tab = Table()
     lis_words = " ".join(lis_lines).split()
     for word in lis_words:
         word_tab.update_pairs(" ".join(list(word)) + "</w>")
-    print(word_tab.tabular)
     return word_tab
+
+
+#
+def merge_sqnce(word_tab, max_pair):
+    """Used to merge the maximum pair in file"""
+    tmp_table = Table()
+    for key, value in word_tab.tabular.items():
+        hold_key = key.replace(max_pair, max_pair.replace(" ", ""))
+        # print(hold_key)
+        # time.sleep(2)
+        tmp_table.tabular[hold_key] = value
+
+    return tmp_table
 
 
 def get_pairs(file):
     # number of operations needed for BDE
     op_number = [1000, 5000, 15000]
     op_sqnce = []  # sequence of operations
-    char_list = []
 
     # list of lines in file
     lis_lines = metrics.read_from_file(file)
     word_tab = get_words(lis_lines)  # table of words in file
 
-    # iterate over
-    # for key, value in word_tab.tabular.items():
-    #     # split word to letters and store in list
-    #     characs = list(key)
-    #     characs[len(characs) - 1] += "</w>"
-    #     char_list.append(characs)
+    for i in range(1000):
+        tmp_table = Table()  # temp structure
 
-    # for i in range(1000):
-    #     tmp_table = Table()  # temp structure
+        if i % 100 == 0:
+            print(op_sqnce)
+        # go through keys
+        # count all occurrences of symbol pairs
+        for key, value in word_tab.tabular.items():
+            sym_list = key.split()
+            for j in range(len(sym_list) - 1):
+                pair = sym_list[j] + " " + sym_list[j + 1]
+                tmp_table.update_pairs(pair)
+                tmp_table.tabular[pair] += value - 1
 
-    #     for characs in char_list:
-    #         for j in range(len(characs) - 1):
-    #             tup = characs[j] + characs[j + 1]
-    #             tmp_table.update_pairs(tup)
-    #             tmp_table.tabular[tup] += (
-    #                 word_tab.tabular[characs[: len(characs) - 4]] - 1
-    #             )
+        # get maximum pair
+        max_pair = tmp_table.get_highest_pair()
+
+        # add max to operation sequence
+        op_sqnce.append(max_pair)
+
+        # merge new values to word table
+        word_tab = merge_sqnce(word_tab, max_pair)
 
     return word_tab
 
 
 def main():
-    t = get_pairs("data_exercise_2/multi30k.de")
+    t = get_pairs("Abgabe 2/data_exercise_2/multi30k.de")
     # print(t.tabular)
 
 
