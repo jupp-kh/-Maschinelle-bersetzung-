@@ -42,9 +42,9 @@ class Table:
 
     def toString(self):
         """Prints Table object as a table with columns pair and frequency"""
-        print("pair     |     freq.")
-        for elem in self._pair_freq.items():
-            print(elem[0], "       |    ", elem[1])
+        for key, value in self.tabular.items():
+            print("(", key, value, ")", end="\t")
+        print("")
 
 
 #
@@ -53,7 +53,6 @@ def get_words(lis_lines):
     lis_words = " ".join(lis_lines).split()
     for word in lis_words:
         word_tab.update_pairs(" ".join(list(word)) + "</w>")
-    print(len(word_tab.tabular))
     return word_tab
 
 
@@ -63,8 +62,6 @@ def count_unk_word(word_tab):
     for key, val in word_tab.tabular.items():
         if len(key.split()) == 1:
             counter += 1
-    print(counter)
-    print(len(word_tab.tabular))
     return counter
 
 
@@ -108,14 +105,15 @@ def get_pairs(file, n):
         word_tab = merge_sqnce(word_tab, max_pair)
 
     count_unk_word(word_tab)
+    word_tab.toString()
     return op_sqnce
 
 
 def main():
     op_number = [1000, 5000, 15000]
-    for n in op_number:
-        get_pairs("Abgabe 2/data_exercise_2/multi30k.de", n)
-    # print(t.tabular)
+    for n in [20, 100]:  # replace list with op_number
+        sqnce = get_pairs("Abgabe 2/data_exercise_2/multi30k.de", n)
+    # print(sqnce)
 
 
 if __name__ == "__main__":
