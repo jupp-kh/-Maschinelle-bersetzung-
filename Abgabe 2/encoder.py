@@ -32,7 +32,6 @@ class Table:
         # lambda gives the value of each key i.e. the second item in tuple
         # val_list = []
         return max(self._pair_freq.items(), key=lambda x: x[1])[0]
-
         # # find all occurences of max_val
         # for key, val in self._pair_freq.items():
         #     if val == max_val[1]:
@@ -56,7 +55,7 @@ def get_words(lis_lines):
     return word_tab
 
 
-def count_unk_word(word_tab):
+def count_kn_word(word_tab):
     """ count number of yet unknown words """
     counter = 0
     for key, val in word_tab.tabular.items():
@@ -76,7 +75,7 @@ def merge_sqnce(word_tab, max_pair):
     return tmp_table
 
 
-def get_pairs(file, n):
+def get_op_sqnce(file, n):
     op_sqnce = []  # sequence of operations
 
     # list of lines in file
@@ -104,16 +103,41 @@ def get_pairs(file, n):
         # merge new values to word table
         word_tab = merge_sqnce(word_tab, max_pair)
 
-    count_unk_word(word_tab)
-    word_tab.toString()
-    return op_sqnce
+    print(count_kn_word(word_tab))
+    # word_tab.toString()
+    return op_sqnce, word_tab
+
+
+#
+def subword_split(file, n):
+    op_sqnce, word_tab = get_op_sqnce(file, n)
+    reader = "\n".join(metrics.read_from_file(file))
+
+    with open(str(file) + str(n), "w", encoding="utf-8") as write_f:
+        # iterate over words in words table
+        # if word \neg exists in file then add @@ between pairs
+        for word, val in word_tab.tabular.items():
+            tmp = word.replace("</w>", "")
+            reader = reader.replace(tmp.replace(" ", ""), tmp.replace(" ", "@@ "))
+
+        # write to new file
+        write_f.write(reader)
+
+
+def revert_bpe(file):
+    reader = "\n".join(metrics.read_from_file(file))
+
+    with open(file, "w", encoding="utf-8") as write_f:
+        write_f.write(reader.replace("@@ ", ""))
 
 
 def main():
-    op_number = [1000, 5000, 15000]
-    for n in [20, 100]:  # replace list with op_number
-        sqnce = get_pairs("Abgabe 2/data_exercise_2/multi30k.de", n)
+    # op_number = [1000, 5000, 15000]
+    for n in [100]:  # replace list with op_number
+        subword_split("Abgabe 2/data_exercise_2/multi30k.de", n)
+    #     # sqnce = get_op_sqnce("Abgabe 2/data_exercise_2/multi30k.de", n)[0]
     # print(sqnce)
+    revert_bpe("Abgabe 2/data_exercise_2/multi30k.de100")
 
 
 if __name__ == "__main__":
