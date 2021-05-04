@@ -2,6 +2,11 @@ import sys
 import metrics
 import subprocess
 import time
+import dictionary
+
+
+# Globals
+deutsch_dict = dictionary.Dictionary()
 
 
 class Table:
@@ -51,16 +56,21 @@ def get_words(lis_lines):
     word_tab = Table()
     lis_words = " ".join(lis_lines).split()
     for word in lis_words:
-        word_tab.update_pairs(" ".join(list(word)) + "</w>")
+        word_tab.update_pairs(" ".join(list(word)) + "</w>")  # t h e</w>
     return word_tab
 
 
 def count_kn_word(word_tab):
-    """ count number of yet unknown words """
+    """ count number of known words """
     counter = 0
     for key, val in word_tab.tabular.items():
         if len(key.split()) == 1:
             counter += 1
+            # save learned words in german dictionary
+            deutsch_dict.update(key[0:-4])
+        else:
+            for sub in key[0:-4].split():
+                deutsch_dict.update(sub)
     return counter
 
 
@@ -111,6 +121,7 @@ def get_op_sqnce(file, n):
 #
 def subword_split(file, n):
     op_sqnce, word_tab = get_op_sqnce(file, n)
+    # word_tab.toString()
     reader = "\n".join(metrics.read_from_file(file))
 
     with open(str(file) + str(n), "w", encoding="utf-8") as write_f:
@@ -133,11 +144,10 @@ def revert_bpe(file):
 
 def main():
     # op_number = [1000, 5000, 15000]
-    for n in [100]:  # replace list with op_number
-        subword_split("Abgabe 2/data_exercise_2/multi30k.de", n)
-    #     # sqnce = get_op_sqnce("Abgabe 2/data_exercise_2/multi30k.de", n)[0]
-    # print(sqnce)
-    revert_bpe("Abgabe 2/data_exercise_2/multi30k.de100")
+    for n in [1000]:  # replace list with op_number
+        subword_split("Abgabe 2/data_exercise_2/multi30k.en", n)
+
+    # revert_bpe("Abgabe 2/data_exercise_2/multi30k.de100")
 
 
 if __name__ == "__main__":
