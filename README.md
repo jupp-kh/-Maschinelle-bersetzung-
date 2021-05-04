@@ -42,6 +42,6 @@ Auf dem zweiten Blatt geht es um die Implementierung des byte pair encoding algo
     - die BPE Zerlegung rückgängig zu machen.
 Darüber hinaus erstellen wir eine Klasse Dictionary, die verwendet wird, um das Vokabular aus einem gegebenen Text/einer gegebenen Datei zu behalten. Der letzte Teil dieses Blattes beschäftigt sich mit der Weiterverarbeitung von Daten - dazu soll eine Funktion zur Erzeugung von "Batches" entwickelt werden.
 
-- [ ] BPE
+- [x] BPE
 - [ ] Klasse Dictionary
 - [ ] Funktion Batch
