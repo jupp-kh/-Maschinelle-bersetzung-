@@ -1,9 +1,11 @@
-import os
 import metrics
+import encoder
 import math
-
+import csv
+import os
 
 class Batch:
+
     def __init__(self):
         """initialises batch with empty matrices"""
         self._source = []
@@ -22,50 +24,93 @@ class Batch:
     def target(self):
         return self._target
 
-    # setter for all properties
-    def set_p(self, src=[], tar=[], lab=[]):
-        """src= source windows, tar= target windows, lab=target labels"""
-        if src != []:
-            self._source = src
-        if tar != []:
-            self._target = tar
-        if lab != []:
-            self.label = lab
+    def append_s(self, sor_line):
+        self._source.append(sor_line)
 
+    def append_t(self, tar_line):
+        self._target.append(tar_line)
 
-def tester(w=2, batch_size=200):
-    """test batch properties"""
-    # TODO: construct a new file for reader and writer functions rather than using function from metrics
-    read_de = metrics.read_from_file("Abgabe 2/data_exercise_2/multi30k.de1000")
-    read_en = metrics.read_from_file("Abgabe 2/data_exercise_2/multi30k.en1000")
-    test_batch = Batch()
+    def append_l(self, tar_lebels):
+        self._label.append(tar_lebels)
 
-    #
-    for tar, src in zip(read_de, read_en):
-        tar_l = tar.split()
-        src_l = src.split()
-        tar_len = len(tar_l)
-        src_len = len(src_l)
-        for i in range(tar_len + 1):
-            b_i = alignment(tar_len, src_len)(i)
-            while b_i - w + len(test_batch.source) < 0:
-                test_batch.source.append(["<s>"])
-            else:
-                test_batch.set_p(src=[[sub] for sub in src[b_i - w : b_i + w]])
-        print(test_batch.source)
+    
+    def toString(self):
+        """print batch"""
+        print("     S     |     T    | L ")
+        for (s,t,l) in zip(self._source, self._target, self._label):
+            print(s,t,l)
+
 
 
 # return lambda function
 # gives a basic alignment by dividing the range by domain
-def alignment(domain, r_ange):
+def alignment(sor_len, tar_len):
     """Returns alignment from target to source"""
     # for range twice the size of domain
     # map 1st element index[0] to 0*r/d = 0
     # map 2nd element index[1] to 1*r/d = 2
     # etc...
-    op = lambda x: math.floor(x * r_ange / domain)
+    op = lambda x: math.floor(x * (tar_len / sor_len))
     return op
 
+def creat_batch(source , target, w):
 
-# testing code
-tester()
+    batch = Batch()
+    max_b_i = alignment(len(target),len(source))(len(target))
+    modifi_sorce = ["<s>" for i in range(w)] + source + ["</s>" for i in range(len(source), max_b_i + w +1)]
+    modifi_target = ["<s>" for i in range(w)] + target + ["</s>"]
+    target.append('</s>')
+    print(modifi_sorce,modifi_target)
+    for i in range(len(target)):
+        batch.append_l(target[i])
+        batch.append_t(modifi_target[i : i + w])
+        b_i = alignment(len(source),len(target))(i)
+        batch.append_s(modifi_sorce[b_i : b_i + 2 * w + 1 ])
+        print(modifi_sorce[b_i : b_i + 2 * w + 1 ],modifi_target[i : i +  w ], target[i])
+    
+    return batch
+
+            
+def creat_batches(sor_file, tar_file, window):
+    os.remove('batch.csv')
+    source = metrics.read_from_file(sor_file)
+    target = metrics.read_from_file(tar_file)
+
+    for i, (sor, tar) in enumerate(zip(source, target)):
+        if(i not in range(1100,1200)):
+            continue
+
+        sor_list = sor.split()
+        tar_list = tar.split()
+
+        while(len(tar_list) > 200):
+            
+            b_i = alignment(len(sor_list),len(tar_list))(200)
+            batch = creat_batch(sor_list[:b_i],tar_list[:200],window)
+            save_batch(batch)
+            tar_list = tar_list[200:]
+            sor_list = sor_list[b_i:]
+
+
+        batch = creat_batch(sor_list,tar_list,window)
+        save_batch(batch)
+
+def save_batch(batch):
+    with open('batch.csv', 'a+',newline = '',encoding="utf-8") as batch_csv:
+        writer = csv.writer(batch_csv)
+        for (s,t,l) in zip(batch.source,batch.target,batch.label):
+            writer.writerow([s,t,l])
+        writer.writerow([])
+    batch_csv.close()
+
+
+
+def main():
+    tar = "ich habe dich gern".split()
+    sor = "i like you".split()
+    creat_batch(sor, tar,2)
+    #creat_batches('data_exercise_2/multi30k.en','data_exercise_2/multi30k.de',2)
+
+
+if __name__ == "__main__":
+    main()    
