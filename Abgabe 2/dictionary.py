@@ -15,9 +15,11 @@ class Dictionary:
         self.bi_dict = {}  # creates dict
 
     # updater function
-    def update(self, vocab):
+    def update(self, *vocabs):
         """adds index and word to dictionary"""
-        self.bi_dict[vocab] = len(self.obj_dict)
+        for vocab in vocabs:
+            if vocab not in self.bi_dict:
+                self.bi_dict[vocab] = len(self.bi_dict)
 
     def get_word(self, index):
         """gets word at index in dictionary"""
@@ -27,6 +29,6 @@ class Dictionary:
         """gets index of word in dictionary"""
         return self.bi_dict[word]
 
-    def toString(self):
+    def __str__(self):
         """prints out dictionary"""
-        print(self.bi_dict)
+        return str(self.bi_dict)

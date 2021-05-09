@@ -1,9 +1,6 @@
-import sys
-import metrics
-import subprocess
-import time
 import dictionary
-
+import sys, time, threading
+import utility
 
 # Globals
 # testing dictionary
@@ -101,7 +98,7 @@ def get_word_tab(file, n):
     # op_sqnce = []  # sequence of operations
 
     # list of lines in file
-    lis_lines = metrics.read_from_file(file)
+    lis_lines = utility.read_from_file(file)
     word_tab = get_words(lis_lines)  # table of words in file
 
     for i in range(n):
@@ -136,7 +133,7 @@ def subword_split(file, n):
     word_tab = get_word_tab(file, n)  # the op_sqnce is redundant data (ー_ー)!!
     # word_tab.toString()
     # reader; full string from file
-    reader = "\n".join(metrics.read_from_file(file))
+    reader = "\n".join(utility.read_from_file(file))
 
     with open(str(file) + str(n), "w", encoding="utf-8") as write_f:
         # iterate over words in words table
@@ -152,7 +149,7 @@ def subword_split(file, n):
 def revert_bpe(file):
     """undos the transformation done to file by BPE"""
     # join all lines into one string separated by \n
-    reader = "\n".join(metrics.read_from_file(file))
+    reader = "\n".join(utility.read_from_file(file))
 
     # write original text back out > file
     with open(file, "w", encoding="utf-8") as write_f:

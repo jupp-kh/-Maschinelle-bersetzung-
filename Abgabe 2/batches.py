@@ -1,13 +1,15 @@
-import metrics
-import encoder
-import math
 import csv
 import os
+import utility as ut
+from utility import cur_dir
+import dictionary
+import math
 
 
 ############## Globals ###############
 # used to store directory of script file
-script_dir = os.path.dirname(__file__)
+dic_tar = dictionary.Dictionary()
+dic_src = dictionary.Dictionary()
 
 # to create our batches we build the three multidimensional arrays
 # S : B x (w * 2 + 1)
@@ -19,6 +21,7 @@ class Batch:
         self._source = []
         self._label = []
         self._target = []
+        self._size = 0
 
     @property
     def source(self):
@@ -34,6 +37,14 @@ class Batch:
     def target(self):
         """gets target windows"""
         return self._target
+
+    @property
+    def size(self):
+        return self._size
+
+    @size.setter
+    def size(self, var):
+        self._size = var
 
     def append_s(self, sor_line):
         self._source.append(sor_line)
@@ -63,84 +74,113 @@ def alignment(sor_len, tar_len):
     return op
 
 
-def create_batch(source, target, w):
-    """called by create_batches, creates the batch and stores data in batch.csv,
-    returns the batch"""
-    batch = Batch()
-    modifi_target = ["<s>" for i in range(w)] + target + ["</s>"]
-    target.append("</s>")
+# target and source passed as lines
+def create_batch(batch, source, target, w):
+    """called by create_batches,
+    creates the batch and stores data in batch.csv,
+    returns batch"""
+    modifi_target = (
+        [dic_tar.get_index("<s>") for i in range(w)]
+        + target
+        + [dic_tar.get_index("</s>")]
+    )
+    target.append(dic_tar.get_index("</s>"))
     max_bi = alignment(len(source), len(target))(len(target))
     modif_source = (
-        ["<s>" for i in range(w)]
+        [dic_src.get_index("<s>") for i in range(w)]
         + source
-        + ["</s>" for i in range(len(source), max_bi + w + 1)]
+        + [dic_src.get_index("</s>") for i in range(len(source), max_bi + w + 1)]
     )
     for i in range(len(target)):
+        batch.size += 1
         batch.append_l(target[i])
         batch.append_t(modifi_target[i : i + w])
         b_i = alignment(len(source), len(target))(i)
         batch.append_s(modif_source[b_i : b_i + 2 * w + 1])
-    #  print(modif_source[b_i : b_i + 2 * w + 1], modifi_target[i : i + w], target[i])
-    #  print(i, b_i)
+        if batch.size == 200:
+            save_batch(batch)
+            batch = Batch()
 
     return batch
 
 
-def create_batches(sor_file, tar_file, window):
+#
+def get_word_index(src, trg):
+    target, source = [], []
+    dic_src.update("<s>", "</s>")
+    dic_tar.update("<s>", "</s>")
+
+    # creating index for each word
+    # mapping lines to list of words
+    for trg_l, src_l in zip(trg, src):
+        tmp_t, tmp_s = [], []
+        for trg_w in trg_l.split():
+            dic_tar.update(trg_w)
+            tmp_t.append(dic_tar.get_index(trg_w))
+        for src_w in src_l.split():
+            dic_src.update(src_w)
+            tmp_s.append(dic_src.get_index(src_w))
+        target.append(tmp_t)
+        source.append(tmp_s)
+
+    return source, target
+
+
+def create_batches(sor_file, tar_file, window, start=0, end=-1):
     """creates the batches by computing source windows, target windows
     and target label for the specified files"""
 
     # remove the batch.csv in output in case it exists
     try:
-        os.remove(os.path.join(script_dir, "output/batch.csv"))
+        os.remove(os.path.join(cur_dir, "output/batch.csv"))
     except:
-        print("No file, creating new file", end="\r")
+        print("No file, creating new file")
 
     # store source and target file as list of words
-    source = " ".join(metrics.read_from_file(sor_file)).split()
-    target = " ".join(metrics.read_from_file(tar_file)).split()
+    src = ut.read_from_file(sor_file, start, end)
+    trg = ut.read_from_file(tar_file, start, end)
 
-    # DONE insert 199 words into L and append </s>
-    # TODO use integers rather than strings to reduce storage
-    while len(target) > 199:
-        b_i = alignment(len(source), len(target))(199)
-        batch = create_batch(source[:b_i], target[:199], window)
-        save_batch(batch)
-        # TODO save the batch for lines 1100 to 1200
-        target = target[199:]
-        source = source[b_i:]
+    source, target = get_word_index(src, trg)
 
-    # calculate final batch
-    if len(target) != 0:
-        batch = create_batch(source, target, window)
+    #
+    size = 0
+    batch = Batch()
+    for s, t in zip(source, target):
+        batch = create_batch(batch, s, t, 2)
+
+    # save last batch
+    if batch.size != 0:
         save_batch(batch)
 
 
 # used to write batches from iteration 1100 to 1200 into file
 def save_batch(batch):
-    file_des = os.path.join(script_dir, "output/batch.csv")
+    file_des = os.path.join(cur_dir, "output/batch.csv")
     with open(file_des, "a+", newline="", encoding="utf-8") as batch_csv:
         writer = csv.writer(batch_csv)
         for (s, t, l) in zip(batch.source, batch.target, batch.label):
-            writer.writerow([" ".join(s), " ".join(t), l])
+            writer.writerow([str(s)[1:-1], str(t)[1:-1], l])
         writer.writerow([])
     batch_csv.close()
 
 
+def export(will=False):
+    des = os.path.join(cur_dir, "output/string.csv")
+    origin = ut.read_from_file(os.path.join(cur_dir, "output/batch.csv"))
+    with open(des, "w", newline="", encoding="utf-8") as string_csv:
+        for line in origin:
+            for word in line:
+                line.replace(word, di)
+
+
 def main():
-    # b = alignment(8390, 179092)(200)
-    # sor = [str(i) for i in range(b)]
-    # tar = [str(i) for i in range(200)]
-    # source = " ".join(sor).split()
-    # target = " ".join(tar).split()
-    # batch = create_batch(source, target, 2)
-    # os.remove("batch.csv")
-    # save_batch(batch)
     create_batches(
-        os.path.join(script_dir, "data_exercise_2/multi30k.en"),
-        os.path.join(script_dir, "data_exercise_2/multi30k.de"),
+        os.path.join(cur_dir, "data_exercise_2/multi30k.en"),
+        os.path.join(cur_dir, "data_exercise_2/multi30k.de"),
         2,
     )
+
+    export(arg[1])
 
 
 if __name__ == "__main__":
