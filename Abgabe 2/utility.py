@@ -1,5 +1,6 @@
 import sys, time, threading
 import os
+import csv
 
 cur_dir = os.path.dirname(__file__)
 
@@ -43,13 +44,14 @@ def loader():
 def read_from_file(datei, start=0, end=-1):
     with open(datei, "r", encoding="utf-8") as in_file:
         res = []
-
+        lines = in_file.readlines()
+        
         if end == -1:
-            end = len(in_file.readlines())
+            end = len(lines)
 
         # append list res with formatted lines
-        for i, line in enumerate(in_file):
+        for i, line in enumerate(lines):
             if i in range(start, end):
                 res.append(line.strip())
-
     return res
+

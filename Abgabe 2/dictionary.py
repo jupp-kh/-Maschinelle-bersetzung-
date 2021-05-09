@@ -23,11 +23,14 @@ class Dictionary:
 
     def get_word(self, index):
         """gets word at index in dictionary"""
-        return self.bi_dict.keys()[index]
+        return list(self.bi_dict.keys())[index]
 
     def get_index(self, word):
         """gets index of word in dictionary"""
         return self.bi_dict[word]
+
+    def get_keys(self):
+        return list(self.bi_dict.keys())
 
     def __str__(self):
         """prints out dictionary"""

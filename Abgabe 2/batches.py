@@ -1,15 +1,16 @@
 import csv
-import os
+import os, sys
 import utility as ut
 from utility import cur_dir
 import dictionary
 import math
 
-
 ############## Globals ###############
 # used to store directory of script file
 dic_tar = dictionary.Dictionary()
 dic_src = dictionary.Dictionary()
+output_filename = "output/batch"
+save_batch = None
 
 # to create our batches we build the three multidimensional arrays
 # S : B x (w * 2 + 1)
@@ -73,12 +74,45 @@ def alignment(sor_len, tar_len):
     op = lambda x: math.floor(x * (sor_len / tar_len))
     return op
 
+def save_batch_as_int(batch):
+    """writes the batch as ints inside batch.csv"""
+    global output_filename
+    file_des = os.path.join(cur_dir, output_filename)
+    with open(file_des, "a+", newline="", encoding="utf-8") as batch_csv:
+        writer = csv.writer(batch_csv)
+        for (s, t, l) in zip(batch.source, batch.target, batch.label):
+            writer.writerow([str(s)[1:-1], str(t)[1:-1], l])
+        writer.writerow([])
+    batch_csv.close()
+
+def save_batch_as_string(batch):
+    """writes the batch as strings inside batch.csv"""   
+    global output_filename
+    file_des = os.path.join(cur_dir, output_filename)
+    with open(file_des, "a+", newline="", encoding="utf-8") as batch_csv:
+        writer = csv.writer(batch_csv)
+
+        tar_keys = dic_tar.get_keys()
+        src_keys = dic_src.get_keys()
+
+        for (s, t, l) in zip(batch.source, batch.target, batch.label):
+            writer.writerow(
+            [
+                " ".join([src_keys[i] for i in s]),
+                " ".join([tar_keys[i] for i in t]), 
+                tar_keys[l]
+                ]
+            )
+        writer.writerow([])
+    batch_csv.close()
 
 # target and source passed as lines
 def create_batch(batch, source, target, w):
     """called by create_batches,
     creates the batch and stores data in batch.csv,
     returns batch"""
+    global save_batch
+
     modifi_target = (
         [dic_tar.get_index("<s>") for i in range(w)]
         + target
@@ -103,9 +137,8 @@ def create_batch(batch, source, target, w):
 
     return batch
 
-
-#
 def get_word_index(src, trg):
+    """uses dictionaries to replace strings with the index"""
     target, source = [], []
     dic_src.update("<s>", "</s>")
     dic_tar.update("<s>", "</s>")
@@ -125,14 +158,25 @@ def get_word_index(src, trg):
 
     return source, target
 
-
-def create_batches(sor_file, tar_file, window, start=0, end=-1):
+# as_string determines if batch is saved with int or strings
+# start and end are the range of lines we create batches for
+def create_batches(sor_file, tar_file, window, as_string=False, start=0, end=-1):
     """creates the batches by computing source windows, target windows
     and target label for the specified files"""
+    global save_batch
+    global output_filename
 
+    if start != 0 or end != -1:
+        output_filename = "output/batch_"+str(start)+"_"+str(end)
+    if as_string:
+        save_batch = save_batch_as_string
+        output_filename += "_string.csv"
+    else:
+        save_batch = save_batch_as_int
+        output_filename += "_int.csv"
     # remove the batch.csv in output in case it exists
     try:
-        os.remove(os.path.join(cur_dir, "output/batch.csv"))
+        os.remove(os.path.join(cur_dir, output_filename))
     except:
         print("No file, creating new file")
 
@@ -152,36 +196,14 @@ def create_batches(sor_file, tar_file, window, start=0, end=-1):
     if batch.size != 0:
         save_batch(batch)
 
-
-# used to write batches from iteration 1100 to 1200 into file
-def save_batch(batch):
-    file_des = os.path.join(cur_dir, "output/batch.csv")
-    with open(file_des, "a+", newline="", encoding="utf-8") as batch_csv:
-        writer = csv.writer(batch_csv)
-        for (s, t, l) in zip(batch.source, batch.target, batch.label):
-            writer.writerow([str(s)[1:-1], str(t)[1:-1], l])
-        writer.writerow([])
-    batch_csv.close()
-
-
-def export(will=False):
-    des = os.path.join(cur_dir, "output/string.csv")
-    origin = ut.read_from_file(os.path.join(cur_dir, "output/batch.csv"))
-    with open(des, "w", newline="", encoding="utf-8") as string_csv:
-        for line in origin:
-            for word in line:
-                line.replace(word, di)
-
-
 def main():
+
     create_batches(
-        os.path.join(cur_dir, "data_exercise_2/multi30k.en"),
-        os.path.join(cur_dir, "data_exercise_2/multi30k.de"),
+        os.path.join(cur_dir, "data_exercise_2","multi30k.en"),
+        os.path.join(cur_dir, "data_exercise_2","multi30k.de"),
         2,
+        as_string=True
     )
-
-    export(arg[1])
-
 
 if __name__ == "__main__":
     main()
