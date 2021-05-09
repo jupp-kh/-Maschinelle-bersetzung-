@@ -12,6 +12,9 @@
 |Rekurrente Neuronale Netzwerke|-|-|-|
 |Blatt 6|-|-|-|
 
+## Testattermin
+
+Uhrzeit: 14:00-15:00
 
 ## Vorlesungtermine 
 
