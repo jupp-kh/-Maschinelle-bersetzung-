@@ -43,5 +43,5 @@ Auf dem zweiten Blatt geht es um die Implementierung des byte pair encoding algo
 Darüber hinaus erstellen wir eine Klasse Dictionary, die verwendet wird, um das Vokabular aus einem gegebenen Text/einer gegebenen Datei zu behalten. Der letzte Teil dieses Blattes beschäftigt sich mit der Weiterverarbeitung von Daten - dazu soll eine Funktion zur Erzeugung von "Batches" entwickelt werden.
 
 - [x] BPE
-- [ ] Klasse Dictionary
-- [ ] Funktion Batch
+- [x] Klasse Dictionary
+- [x] Funktion Batch
