@@ -1,28 +1,51 @@
-import metrics
-import encoder
-import math
 import csv
-import os
+import os, sys
+import utility as ut
+from utility import cur_dir
+import dictionary
+import math
 
+############## Globals ###############
+# used to store directory of script file
+dic_tar = dictionary.Dictionary()
+dic_src = dictionary.Dictionary()
+output_filename = "output/batch"
+save_batch = None
+
+# to create our batches we build the three multidimensional arrays
+# S : B x (w * 2 + 1)
+# T : B x w
+# L : B
 class Batch:
-
     def __init__(self):
         """initialises batch with empty matrices"""
         self._source = []
         self._label = []
         self._target = []
+        self._size = 0
 
     @property
     def source(self):
+        """gets source windows"""
         return self._source
 
     @property
     def label(self):
+        """gets target labels"""
         return self._label
 
     @property
     def target(self):
+        """gets target windows"""
         return self._target
+
+    @property
+    def size(self):
+        return self._size
+
+    @size.setter
+    def size(self, var):
+        self._size = var
 
     def append_s(self, sor_line):
         self._source.append(sor_line)
@@ -33,13 +56,11 @@ class Batch:
     def append_l(self, tar_lebels):
         self._label.append(tar_lebels)
 
-    
     def toString(self):
-        """print batch"""
+        """prints batch"""
         print("     S     |     T    | L ")
-        for (s,t,l) in zip(self._source, self._target, self._label):
-            print(s,t,l)
-
+        for (s, t, l) in zip(self._source, self._target, self._label):
+            print(s, t, l)
 
 
 # return lambda function
@@ -50,67 +71,139 @@ def alignment(sor_len, tar_len):
     # map 1st element index[0] to 0*r/d = 0
     # map 2nd element index[1] to 1*r/d = 2
     # etc...
-    op = lambda x: math.floor(x * (tar_len / sor_len))
+    op = lambda x: math.floor(x * (sor_len / tar_len))
     return op
 
-def creat_batch(source , target, w):
-
-    batch = Batch()
-    max_b_i = alignment(len(target),len(source))(len(target))
-    modifi_sorce = ["<s>" for i in range(w)] + source + ["</s>" for i in range(len(source), max_b_i + w +1)]
-    modifi_target = ["<s>" for i in range(w)] + target + ["</s>"]
-    target.append('</s>')
-    print(modifi_sorce,modifi_target)
-    for i in range(len(target)):
-        batch.append_l(target[i])
-        batch.append_t(modifi_target[i : i + w])
-        b_i = alignment(len(source),len(target))(i)
-        batch.append_s(modifi_sorce[b_i : b_i + 2 * w + 1 ])
-        print(modifi_sorce[b_i : b_i + 2 * w + 1 ],modifi_target[i : i +  w ], target[i])
-    
-    return batch
-
-            
-def creat_batches(sor_file, tar_file, window):
-    os.remove('batch.csv')
-    source = metrics.read_from_file(sor_file)
-    target = metrics.read_from_file(tar_file)
-
-    for i, (sor, tar) in enumerate(zip(source, target)):
-        if(i not in range(1100,1200)):
-            continue
-
-        sor_list = sor.split()
-        tar_list = tar.split()
-
-        while(len(tar_list) > 200):
-            
-            b_i = alignment(len(sor_list),len(tar_list))(200)
-            batch = creat_batch(sor_list[:b_i],tar_list[:200],window)
-            save_batch(batch)
-            tar_list = tar_list[200:]
-            sor_list = sor_list[b_i:]
-
-
-        batch = creat_batch(sor_list,tar_list,window)
-        save_batch(batch)
-
-def save_batch(batch):
-    with open('batch.csv', 'a+',newline = '',encoding="utf-8") as batch_csv:
+def save_batch_as_int(batch):
+    """writes the batch as ints inside batch.csv"""
+    global output_filename
+    file_des = os.path.join(cur_dir, output_filename)
+    with open(file_des, "a+", newline="", encoding="utf-8") as batch_csv:
         writer = csv.writer(batch_csv)
-        for (s,t,l) in zip(batch.source,batch.target,batch.label):
-            writer.writerow([s,t,l])
+        for (s, t, l) in zip(batch.source, batch.target, batch.label):
+            writer.writerow([str(s)[1:-1], str(t)[1:-1], l])
         writer.writerow([])
     batch_csv.close()
 
+def save_batch_as_string(batch):
+    """writes the batch as strings inside batch.csv"""   
+    global output_filename
+    file_des = os.path.join(cur_dir, output_filename)
+    with open(file_des, "a+", newline="", encoding="utf-8") as batch_csv:
+        writer = csv.writer(batch_csv)
 
+        tar_keys = dic_tar.get_keys()
+        src_keys = dic_src.get_keys()
+
+        for (s, t, l) in zip(batch.source, batch.target, batch.label):
+            writer.writerow(
+            [
+                " ".join([src_keys[i] for i in s]),
+                " ".join([tar_keys[i] for i in t]), 
+                tar_keys[l]
+                ]
+            )
+        writer.writerow([])
+    batch_csv.close()
+
+# target and source passed as lines
+def create_batch(batch, source, target, w):
+    """called by create_batches,
+    creates the batch and stores data in batch.csv,
+    returns batch"""
+    global save_batch
+
+    modifi_target = (
+        [dic_tar.get_index("<s>") for i in range(w)]
+        + target
+        + [dic_tar.get_index("</s>")]
+    )
+    target.append(dic_tar.get_index("</s>"))
+    max_bi = alignment(len(source), len(target))(len(target))
+    modif_source = (
+        [dic_src.get_index("<s>") for i in range(w)]
+        + source
+        + [dic_src.get_index("</s>") for i in range(len(source), max_bi + w + 1)]
+    )
+    for i in range(len(target)):
+        batch.size += 1
+        batch.append_l(target[i])
+        batch.append_t(modifi_target[i : i + w])
+        b_i = alignment(len(source), len(target))(i)
+        batch.append_s(modif_source[b_i : b_i + 2 * w + 1])
+        if batch.size == 200:
+            save_batch(batch)
+            batch = Batch()
+
+    return batch
+
+def get_word_index(src, trg):
+    """uses dictionaries to replace strings with the index"""
+    target, source = [], []
+    dic_src.update("<s>", "</s>")
+    dic_tar.update("<s>", "</s>")
+
+    # creating index for each word
+    # mapping lines to list of words
+    for trg_l, src_l in zip(trg, src):
+        tmp_t, tmp_s = [], []
+        for trg_w in trg_l.split():
+            dic_tar.update(trg_w)
+            tmp_t.append(dic_tar.get_index(trg_w))
+        for src_w in src_l.split():
+            dic_src.update(src_w)
+            tmp_s.append(dic_src.get_index(src_w))
+        target.append(tmp_t)
+        source.append(tmp_s)
+
+    return source, target
+
+# as_string determines if batch is saved with int or strings
+# start and end are the range of lines we create batches for
+def create_batches(sor_file, tar_file, window, as_string=False, start=0, end=-1):
+    """creates the batches by computing source windows, target windows
+    and target label for the specified files"""
+    global save_batch
+    global output_filename
+
+    if start != 0 or end != -1:
+        output_filename = "output/batch_"+str(start)+"_"+str(end)
+    if as_string:
+        save_batch = save_batch_as_string
+        output_filename += "_string.csv"
+    else:
+        save_batch = save_batch_as_int
+        output_filename += "_int.csv"
+    # remove the batch.csv in output in case it exists
+    try:
+        os.remove(os.path.join(cur_dir, output_filename))
+    except:
+        print("No file, creating new file")
+
+    # store source and target file as list of words
+    src = ut.read_from_file(sor_file, start, end)
+    trg = ut.read_from_file(tar_file, start, end)
+
+    source, target = get_word_index(src, trg)
+
+    #
+    size = 0
+    batch = Batch()
+    for s, t in zip(source, target):
+        batch = create_batch(batch, s, t, 2)
+
+    # save last batch
+    if batch.size != 0:
+        save_batch(batch)
 
 def main():
-    tar = "ich habe dich gern".split()
-    sor = "i like you".split()
-    creat_batch(sor, tar,2)
-    #creat_batches('data_exercise_2/multi30k.en','data_exercise_2/multi30k.de',2)
 
+    create_batches(
+        os.path.join(cur_dir, "data_exercise_2","multi30k.en"),
+        os.path.join(cur_dir, "data_exercise_2","multi30k.de"),
+        2,
+        as_string=True
+    )
 
 if __name__ == "__main__":
-    main()    
+    main()

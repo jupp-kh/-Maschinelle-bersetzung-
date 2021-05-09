@@ -4,6 +4,7 @@ import math
 import os
 import subprocess
 from math import pi
+from utility import read_from_file
 
 
 # TODO REQ Beim Levenstein-Distanz fehlt noch auszugeben, welche Einfügungen,
@@ -116,19 +117,6 @@ def bleu_num_denom(reference, hypothesis, n):
     return (sum_numerator, sum_denominator)
 
 
-# this method reads from file datei
-# returns a list of read file lines
-def read_from_file(datei):
-    with open(datei, "r", encoding="utf-8") as in_file:
-        res = []
-
-        # append list res with formatted lines
-        for line in in_file:
-            res.append(line.strip())
-
-    return res
-
-
 # function to calculate the modified n-gram precision
 def precision(reference, hypothese, n):
     if len(reference) != len(hypothese):
@@ -157,8 +145,8 @@ def brevity_penalty(referenz, hypothese):
 # Bilingual Evaluation Study
 # Basic idea: How many blocks are identical in reference and hypothesis?
 def met_bleu(datei1, datei2, n):
-    referenz = read_from_file(datei1)
-    hypothese = read_from_file(datei2)
+    referenz = utility.read_from_file(datei1)
+    hypothese = utility.read_from_file(datei2)
     res = 0
 
     # calculate the precision
@@ -177,8 +165,8 @@ def met_bleu(datei1, datei2, n):
 
 # function to compute the Word-Error-Rate aka WER
 def met_wer(datei1, datei2):
-    referenz = read_from_file(datei1)
-    hypothese = read_from_file(datei2)
+    referenz = utility.read_from_file(datei1)
+    hypothese = utility.read_from_file(datei2)
     sum_leven_d = 0
 
     # compute the sum over all reference-hypothesis pair
@@ -190,8 +178,8 @@ def met_wer(datei1, datei2):
 
 # function to compute the Position-independent Error Rate aka PER
 def met_per(datei1, datei2):
-    referenz = "".join(read_from_file(datei1)).split()
-    hypothese = "".join(read_from_file(datei2)).split()
+    referenz = "".join(utility.read_from_file(datei1)).split()
+    hypothese = "".join(utility.read_from_file(datei2)).split()
     words = removeduplicate(referenz)
     parity = 0
 

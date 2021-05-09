@@ -1,14 +1,11 @@
-import sys
-import metrics
-import subprocess
-import time
 import dictionary
-
+import sys, time, threading
+import utility
 
 # Globals
 # testing dictionary
 # the data structure needs some work
-deutsch_dict = dictionary.Dictionary()
+# deutsch_dict = dictionary.Dictionary()
 
 # based on table in page 23 in "Folien zum Vokabular und Subwords Units"
 class Table:
@@ -76,10 +73,10 @@ def count_kn_word(word_tab):
             # TODO: maybe remove this, as it is just an assumption for
             #       that our dictionary would store the tokens/subwords.
             # save learned subwords in german dictionary
-            deutsch_dict.update(key[0:-4])
-        else:
-            for sub in key[0:-4].split():
-                deutsch_dict.update(sub)
+        #     deutsch_dict.update(key[0:-4])
+        # else:
+        #     for sub in key[0:-4].split():
+        #         deutsch_dict.update(sub)
     return counter
 
 
@@ -97,11 +94,11 @@ def merge_sqnce(word_tab, max_pair):
 
 
 # FIXME change name, as op_sqnce is redundant
-def get_op_sqnce(file, n):
-    op_sqnce = []  # sequence of operations
+def get_word_tab(file, n):
+    # op_sqnce = []  # sequence of operations
 
     # list of lines in file
-    lis_lines = metrics.read_from_file(file)
+    lis_lines = utility.read_from_file(file)
     word_tab = get_words(lis_lines)  # table of words in file
 
     for i in range(n):
@@ -120,23 +117,23 @@ def get_op_sqnce(file, n):
         max_pair = tmp_table.get_highest_pair()
 
         # add max to operation sequence
-        op_sqnce.append(max_pair)
+        # op_sqnce.append(max_pair)
 
         # merge new values to word table
         word_tab = merge_sqnce(word_tab, max_pair)
 
     print(count_kn_word(word_tab))
     # word_tab.toString()
-    return op_sqnce, word_tab
+    return word_tab
 
 
 #
 def subword_split(file, n):
     """performs subword split method on the given file"""
-    op_sqnce, word_tab = get_op_sqnce(file, n)  # the op_sqnce is redundant data (ー_ー)!!
+    word_tab = get_word_tab(file, n)  # the op_sqnce is redundant data (ー_ー)!!
     # word_tab.toString()
     # reader; full string from file
-    reader = "\n".join(metrics.read_from_file(file))
+    reader = "\n".join(utility.read_from_file(file))
 
     with open(str(file) + str(n), "w", encoding="utf-8") as write_f:
         # iterate over words in words table
@@ -152,7 +149,7 @@ def subword_split(file, n):
 def revert_bpe(file):
     """undos the transformation done to file by BPE"""
     # join all lines into one string separated by \n
-    reader = "\n".join(metrics.read_from_file(file))
+    reader = "\n".join(utility.read_from_file(file))
 
     # write original text back out > file
     with open(file, "w", encoding="utf-8") as write_f:
