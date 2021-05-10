@@ -186,8 +186,7 @@ def create_batches(sor_file, tar_file, window, as_string=False, start=0, end=-1)
 
     source, target = get_word_index(src, trg)
 
-    #
-    size = 0
+    
     batch = Batch()
     for s, t in zip(source, target):
         batch = create_batch(batch, s, t, 2)
@@ -202,7 +201,9 @@ def main():
         os.path.join(cur_dir, "data_exercise_2","multi30k.en"),
         os.path.join(cur_dir, "data_exercise_2","multi30k.de"),
         2,
-        as_string=True
+        as_string=False,
+        start = 100,
+        end = 300
     )
 
 if __name__ == "__main__":

@@ -1,6 +1,7 @@
 import dictionary
 import sys, time, threading
 import utility
+import os
 
 # Globals
 # testing dictionary
@@ -66,10 +67,12 @@ def get_words(lis_lines):
 
 def count_kn_word(word_tab):
     """ count number of known words """
-    counter = 0
+    kn_counter = 0
+    sw_counter = 0
     for key, val in word_tab.tabular.items():
         if len(key.split()) == 1:
-            counter += 1
+            kn_counter += 1
+        sw_counter += len(key.split())
             # TODO: maybe remove this, as it is just an assumption for
             #       that our dictionary would store the tokens/subwords.
             # save learned subwords in german dictionary
@@ -77,7 +80,7 @@ def count_kn_word(word_tab):
         # else:
         #     for sub in key[0:-4].split():
         #         deutsch_dict.update(sub)
-    return counter
+    return kn_counter, sw_counter
 
 
 #
@@ -114,6 +117,8 @@ def get_word_tab(file, n):
                 tmp_table.tabular[pair] += value - 1
 
         # get maximum pair
+        if not tmp_table:
+            return word_tab
         max_pair = tmp_table.get_highest_pair()
 
         # add max to operation sequence
@@ -157,9 +162,9 @@ def revert_bpe(file):
 
 
 def main():
-    # op_number = [1000, 5000, 15000]
-    for n in [1000]:  # replace list with op_number
-        subword_split("Abgabe 2/data_exercise_2/multi30k.en", n)
+    op_number = [15000]
+    for n in op_number:  # replace list with op_number
+        subword_split(os.path.join(utility.cur_dir ,"data_exercise_2/multi30k.de"), n)
 
     # revert_bpe("Abgabe 2/data_exercise_2/multi30k.de100")
 
