@@ -53,12 +53,12 @@ Darüber hinaus erstellen wir eine Klasse Dictionary, die verwendet wird, um das
 
 In diesem Übungsblatt besteht die Aufgabe darin, erste Features des Feed-Forward-Übersetzungsmodells einzubauen. Der Code soll um neue Funktionalitäten erweitert werden, die für den Aufbau eines Feed-Forward-Netzwerks grundlegend sind. Hierfür steht die folgende Liste zur Verfügung. Für die Implementierung wird die Python-Interface von Tensorflow verwendet. Weiterhin sollte die Implementierung die Anforderungen (für das NN) auf Seite 36 in den Folien berücksichtigen. 
 
-- [x] Speicherung von Batches verwerfen. 
-- [x] Zusammenzugsoperationen in csv speichern
-- [x] Implementierung von SGD. (Stochastik Gradient Descent)
-- [x] Modelle nach Userauswahl speichern.
-- [x] Metriken wie Accurracy und Perplexity in regelmäßigen Abständen ausgeben
-- [x] Auf einem gegebenen Entwicklungsdaten alle n Updates das Modell auswerten
-- [x] Netzwerkstruktur deutlich machen (details im Aufgabenblatt + Tensorboard)
-- [x] BPE mit 7k Zusammenzugoperationen testen, um den niedrigsten Perplexity Wert den des Modells Entwicklungsdaten herauszufinden. 
+- [ ] Speicherung von Batches verwerfen. 
+- [ ] Zusammenzugsoperationen in csv speichern
+- [ ] Implementierung von SGD. (Stochastik Gradient Descent)
+- [ ] Modelle nach Userauswahl speichern.
+- [ ] Metriken wie Accurracy und Perplexity in regelmäßigen Abständen ausgeben
+- [ ] Auf einem gegebenen Entwicklungsdaten alle n Updates das Modell auswerten
+- [ ] Netzwerkstruktur deutlich machen (details im Aufgabenblatt + Tensorboard)
+- [ ] BPE mit 7k Zusammenzugoperationen testen, um den niedrigsten Perplexity Wert den des Modells Entwicklungsdaten herauszufinden. 
 
