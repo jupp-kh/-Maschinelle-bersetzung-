@@ -5,8 +5,8 @@
 | Thema | Deadline |Abgabe commitNr| geschafft |
 | - | ----- | - | - |
 |Metriken|26.04|2e6ca3e0|:heavy_check_mark:|
-|Der byte pair enconding (BPE) |10.05|03e07168908f743b9b72da835122fcd4ef25f26d|-|
-|Vokabular und Subword Units|-|-|-|
+|Der byte pair enconding (BPE) |10.05|03e07168908f743b9b72da835122fcd4ef25f26d|:heavy_check_mark:|
+|Vokabular und Subword Units|31.05|-|-|
 |Feed Forward Netzwerke|-|-|-|
 |Suche|-|-|-|
 |Rekurrente Neuronale Netzwerke|-|-|-|
@@ -22,9 +22,8 @@ Uhrzeit: 14:00-15:00
 |-------|------   	|
 |13.04  |Metriken 	|  
 |27.04  |Vokabular und Subword Units|
-|04.05  |		|	
-|(!)    |		|
-|11.05  |		|
+|04.05  |Grundlagen Neuronale Netze und Tensorflow|
+|11.05  |Feedforward Modell|
 |01.06  |		|	
 |15.06  |		| 
 |06.07  |		|
