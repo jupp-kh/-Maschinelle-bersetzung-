@@ -190,7 +190,6 @@ def create_batches(sor_file, tar_file, window, as_string=False, start=0, end=-1)
  
     batch = Batch()
     for s, t in zip(source, target):
-        
         batch = create_batch(batch, s, t, 2)
         if batch.size >= 200:
             newbatch = Batch()
@@ -201,9 +200,10 @@ def create_batches(sor_file, tar_file, window, as_string=False, start=0, end=-1)
                 batch.label.remove(batch.label[200])
                 newbatch.append_t(batch.target[200]) 
                 batch.target.remove(batch.target[200])
-            #Todo bearbeitung des batches 
+                newbatch.size += 1
+                batch.size -= 1
+            #TODO bearbeitung des batches
             batch = newbatch 
-                
                 
             
     # save last batch
@@ -218,7 +218,7 @@ def main():
         2,
         as_string=False,
         start = 100,
-        end = 300
+        end = 500
     )
 
 if __name__ == "__main__":

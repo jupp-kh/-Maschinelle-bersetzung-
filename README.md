@@ -52,7 +52,7 @@ Darüber hinaus erstellen wir eine Klasse Dictionary, die verwendet wird, um das
 
 In diesem Übungsblatt besteht die Aufgabe darin, erste Features des Feed-Forward-Übersetzungsmodells einzubauen. Der Code soll um neue Funktionalitäten erweitert werden, die für den Aufbau eines Feed-Forward-Netzwerks grundlegend sind. Hierfür steht die folgende Liste zur Verfügung. Für die Implementierung wird die Python-Interface von Tensorflow verwendet. Weiterhin sollte die Implementierung die Anforderungen (für das NN) auf Seite 36 in den Folien berücksichtigen. 
 
-- [ ] Speicherung von Batches verwerfen. 
+- [x] Speicherung von Batches verwerfen. 
 - [x] Zusammenzugsoperationen in csv speichern
 - [ ] Implementierung von SGD. (Stochastik Gradient Descent)
 - [ ] Modelle nach Userauswahl speichern.

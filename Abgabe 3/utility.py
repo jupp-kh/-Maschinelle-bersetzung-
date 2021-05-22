@@ -41,6 +41,7 @@ def loader():
 
 # this method reads from file datei
 # returns a list of read file lines
+## FIXME i cant understand deutsch 
 def read_from_file(datei, start=0, end=-1):
     with open(datei, "r", encoding="utf-8") as in_file:
         res = []
