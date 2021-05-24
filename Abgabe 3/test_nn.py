@@ -3,6 +3,7 @@ import tensorflow as tf
 import numpy as np
 import os
 from tensorflow import keras
+from tensorflow.python.keras.backend import softmax
 from tensorflow.python.keras.layers.core import Dense
 import batches
 from batches import Batch, get_next_batch
@@ -47,8 +48,8 @@ class Feedforward:
         """
         build our neural network model
         """
-        dic_src = range(100)
-        dic_tar = range(100)
+        # dic_src = range(100)
+        # dic_tar = range(100)
 
         in_src = []
         out_src = []
@@ -75,17 +76,27 @@ class Feedforward:
         out_dense_tar = Dense(500, activation="relu")(fully_con_tar)
 
         # concatenate output from src and tar in concat layer
-        dense_concat = concatenate([fully_con_src, fully_con_tar])
+        dense_concat = concatenate([out_dense_src, out_dense_tar])
+
+        # fully connected layer 1
+        fully_connected_one = Dense(500, activation="relu")(dense_concat)
+
+        # second fully connected layer / projection
+        fully_connected_two = Dense(500, activation=None)(fully_connected_one)
+
+        # softmax layer
+        softmax_layer = keras.layers.Softmax()(fully_connected_two)
 
         # in1 = in_src.extend(in_tar)
-        self.model = Model(inputs=[in_src, in_tar], outputs=[dense_concat])
+        # build final model
+        self.model = Model(inputs=[in_src, in_tar], outputs=[softmax_layer])
 
     def compile_model(self):
 
         self.model.compile(
             optimizer="SGD",
-            loss=keras.losses.SparseCategoricalCrossentropy(from_logits=True),
-            metrics=["accuracy"],
+            loss=keras.losses.SparseCategoricalCrossentropy(from_logits=False),
+            metrics=["accuracy", "perplexity"],
         )
 
         # model.fit()
