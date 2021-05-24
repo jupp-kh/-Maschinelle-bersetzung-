@@ -7,6 +7,9 @@ from batches import Batch, get_next_batch
 import utility as ut
 from dictionary import dic_src, dic_tar
 
+from keras.layers import Input, concatenate, Embedding
+from keras.models import Model
+
 # globals sit here.
 
 
@@ -44,6 +47,18 @@ class Feedforward:
         build our neural network model
         """
 
+        inSour = []
+        outSour = []
+        for i in range(2*w+1):
+            inSour.append(Input())
+            outSour.append(Embedding(1000, 64, input_length=10)(inSour[i]))
+        inFulConSour = concatenate(outSour)
+
+
+        in1 = inSour
+        self.model = Model(inputs=in1, outputs=[inFulConSour])
+
+        '''
         # first declare model
         self.model = keras.Sequential(
             [
@@ -53,6 +68,7 @@ class Feedforward:
                 ),  # fully connected source / target
                 keras.layers.Dense(10),
             ]
+        '''
         )
 
     def compile_model(self):
