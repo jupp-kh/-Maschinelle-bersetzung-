@@ -1,5 +1,7 @@
-import os
-import sys
+"""
+contains Dictionary class, which includes a bidirectional dictionary 
+for quick mapping between words and integer values.
+"""
 
 
 class Dictionary:
@@ -35,3 +37,8 @@ class Dictionary:
     def __str__(self):
         """prints out dictionary"""
         return str(self.bi_dict)
+
+
+###  Globals
+dic_tar = Dictionary()
+dic_src = Dictionary()
