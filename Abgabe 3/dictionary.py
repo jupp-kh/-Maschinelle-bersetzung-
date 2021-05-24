@@ -38,6 +38,9 @@ class Dictionary:
         """prints out dictionary"""
         return str(self.bi_dict)
 
+    def __len__(self):
+        return len(self.bi_dict)
+
 
 ###  Globals
 dic_tar = Dictionary()

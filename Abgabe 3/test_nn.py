@@ -1,14 +1,15 @@
+from numpy.core.numeric import full
 import tensorflow as tf
 import numpy as np
 import os
 from tensorflow import keras
+from tensorflow.python.keras.layers.core import Dense
 import batches
 from batches import Batch, get_next_batch
 import utility as ut
 from dictionary import dic_src, dic_tar
-
-from keras.layers import Input, concatenate, Embedding
-from keras.models import Model
+from tensorflow.keras.layers import Input, concatenate, Embedding
+from tensorflow.keras.models import Model
 
 # globals sit here.
 
@@ -42,34 +43,42 @@ class Feedforward:
         self.model = None
 
     # the model
-    def build_model(self, batch, w):
+    def build_model(self, w):
         """
         build our neural network model
         """
+        dic_src = range(100)
+        dic_tar = range(100)
 
-        inSour = []
-        outSour = []
-        for i in range(2*w+1):
-            inSour.append(Input())
-            outSour.append(Embedding(1000, 64, input_length=10)(inSour[i]))
-        inFulConSour = concatenate(outSour)
+        in_src = []
+        out_src = []
+        for i in range(2 * w + 1):
+            in_src.append(Input(shape=(1, len(dic_src))))
+            out_src.append(
+                Embedding(len(dic_src), 500, input_length=2 * w + 1)(in_src[i])
+            )
+        fully_con_src = concatenate(out_src)
 
+        # output of fully connected layer
+        out_dense_src = Dense(500, activation="relu")(fully_con_src)
 
-        in1 = inSour
-        self.model = Model(inputs=in1, outputs=[inFulConSour])
+        in_tar = []
+        out_tar = []
 
-        '''
-        # first declare model
-        self.model = keras.Sequential(
-            [
-                keras.layers.Flatten(input_shape=(w, w)),  # input layer for batch
-                keras.layers.Dense(
-                    128, activation="relu"
-                ),  # fully connected source / target
-                keras.layers.Dense(10),
-            ]
-        '''
-        )
+        for i in range(w):
+            in_tar.append(Input(shape=(1, len(dic_tar))))
+            out_tar.append(Embedding(len(dic_tar), 500, input_length=w)(in_tar[i]))
+
+        fully_con_tar = concatenate(out_tar)
+
+        # output of fully connected layer
+        out_dense_tar = Dense(500, activation="relu")(fully_con_tar)
+
+        # concatenate output from src and tar in concat layer
+        dense_concat = concatenate([fully_con_src, fully_con_tar])
+
+        # in1 = in_src.extend(in_tar)
+        self.model = Model(inputs=[in_src, in_tar], outputs=[dense_concat])
 
     def compile_model(self):
 

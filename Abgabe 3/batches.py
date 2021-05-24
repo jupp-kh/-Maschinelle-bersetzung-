@@ -25,17 +25,19 @@ class Batch:
 
     @property
     def source(self):
-        """gets source windows"""
+        """gets source windows
+        size 2 * w + 1"""
         return self._source
 
     @property
     def label(self):
-        """gets target labels"""
+        """gets target labels """
         return self._label
 
     @property
     def target(self):
-        """gets target windows"""
+        """gets target windows
+        size w"""
         return self._target
 
     @property
