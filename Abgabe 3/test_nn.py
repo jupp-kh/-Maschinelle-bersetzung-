@@ -3,7 +3,7 @@ import tensorflow as tf
 import numpy as np
 import os
 from tensorflow import keras
-from tensorflow.python.keras.backend import softmax
+from tensorflow.python.keras.backend import _LOCAL_DEVICES
 from tensorflow.python.keras.layers.core import Dense
 import batches
 from batches import Batch, get_next_batch
@@ -11,6 +11,7 @@ import utility as ut
 from dictionary import dic_src, dic_tar
 from tensorflow.keras.layers import Input, concatenate, Embedding
 from tensorflow.keras.models import Model
+from tensorflow.python.client import device_lib  # use this for gpu integration
 
 # globals sit here.
 
@@ -48,8 +49,9 @@ class Feedforward:
         """
         build our neural network model
         """
-        # dic_src = range(100)
-        # dic_tar = range(100)
+        dic_src = range(100)
+        dic_tar = range(100)
+        integrate_gpu()
 
         in_src = []
         out_src = []
@@ -126,3 +128,14 @@ def run_nn(sor_file, tar_file, window=2):
 
         # run nn
         batch = unfinished
+
+
+def integrate_gpu():
+    if not _LOCAL_DEVICES:
+        os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+
+
+def main():
+    model = Feedforward()
+    model.build_model(2)
+    keras.utils.plot_model(model.model, "model.png")
