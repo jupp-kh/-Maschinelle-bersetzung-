@@ -1,19 +1,19 @@
-from numpy.core.numeric import full
 import tensorflow as tf
 import numpy as np
+from tensorflow._api.v2 import data
+import utility as ut
 import os
 from tensorflow import keras
-from tensorflow.python.keras.backend import _LOCAL_DEVICES
 from tensorflow.python.keras.layers.core import Dense
 import batches
 from batches import Batch, get_next_batch
-import utility as ut
-from dictionary import dic_src, dic_tar
 from tensorflow.keras.layers import Input, concatenate, Embedding
 from tensorflow.keras.models import Model
-from tensorflow.python.client import device_lib  # use this for gpu integration
 
 # globals sit here.
+from dictionary import dic_src, dic_tar
+from utility import cur_dir
+from tensorflow.python.keras.backend import _LOCAL_DEVICES
 
 
 # Steps for feed forward network
@@ -103,6 +103,9 @@ class Feedforward:
 
         # model.fit()
 
+    def show_summary(self):
+        print(self.model.summary())
+
 
 def feeder(batch):
     pass
@@ -110,24 +113,49 @@ def feeder(batch):
 
 def run_nn(sor_file, tar_file, window=2):
     batch = Batch()
+    # BUG: REQ das Label muss während das lernen immer bekannt sein. S9 Architektur in letzte VL
+    train_model = Feedforward()
+    train_model.build_model(2)
+    train_model.show_summary()
+    train_model.compile_model()
 
     # store source and target file as list of words
     src = ut.read_from_file(sor_file)
     trg = ut.read_from_file(tar_file)
 
     source, target = batches.get_word_index(src, trg)
+    batch, unfinished = Batch(), Batch()
 
     # running model on the fly
     for s, t in zip(source, target):
+        # DONE FIXME: error due to batch < 200
+
         batch, unfinished = get_next_batch(batch, s, t, window)
+
+        # get next lines to assure batch size exceeds 200 lines
+        if batch.size < 200:
+            continue
 
         # create one hot vectors for batch
         src_window = tf.one_hot(batch.source, depth=len(dic_src))
         tar_window = tf.one_hot(batch.target, depth=len(dic_tar))
-        labels = tf.one_hot(batch.label, depth=len(dic_tar))
+        # labels = tf.one_hot(batch.label, depth=len(dic_tar))
+
+        # use dataset to combine src tar (and labels - later?)
+        # for now data.Dataset
+        # creates tensors from lists
+        feed_src = tf.data.Dataset.from_tensor_slices(src_window)
+        feed_tar = tf.data.Dataset.from_tensor_slices(tar_window)
+
+        # before proceeding note: perhaps TODO Batch Normalization S. 11 letzte VL
+
+        # uncomment following 2 lines to see the tensor shape
+        # for element in dataset:
+        #     print(element)
 
         # run nn
         batch = unfinished
+        break
 
 
 def integrate_gpu():
@@ -136,6 +164,11 @@ def integrate_gpu():
 
 
 def main():
-    model = Feedforward()
-    model.build_model(2)
-    keras.utils.plot_model(model.model, "model.png")
+    ## Run neural network
+    run_nn(
+        os.path.join(cur_dir, "data_exercise_3", "multi30k.en"),
+        os.path.join(cur_dir, "data_exercise_3", "multi30k.de"),
+    )
+
+
+main()

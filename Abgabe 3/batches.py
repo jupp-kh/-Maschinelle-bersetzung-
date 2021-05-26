@@ -221,7 +221,17 @@ def create_batches(sor_file, tar_file, window=2, as_string=False, start=0, end=-
 
 
 def get_next_batch(batch, s, t, w=2):
+    """
+    Creates the next batch
+    Called on the fly, see test_nn.main()
+    """
     batch = create_batch(batch, s, t, w)
+
+    # make sure batch size exceeds 200 lines
+    # while batch.size < 200:
+    #     batch = create_batch(batch, s, t, w)
+
+    # remove unnecessary lines from batch to maintain 200 lines per batch
     if batch.size >= 200:
         newbatch = Batch()
         for i in range(200, batch.size):
@@ -233,9 +243,12 @@ def get_next_batch(batch, s, t, w=2):
             batch.target.remove(batch.target[200])
             newbatch.size += 1
             batch.size -= 1
-        # TODO bearbeitung des batches
+
+        # Hold on to the excesive lines for next batch
         return batch, newbatch
-    return batch
+
+    # returns None when batch contains exactly 200 lines
+    return batch, None
 
 
 def main():
