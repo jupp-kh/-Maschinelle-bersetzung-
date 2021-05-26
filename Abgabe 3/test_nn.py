@@ -1,6 +1,7 @@
 import tensorflow as tf
 import numpy as np
 from tensorflow._api.v2 import data
+from tensorflow.python import training
 import utility as ut
 import os
 from tensorflow import keras
@@ -58,33 +59,33 @@ class Feedforward:
         for i in range(2 * w + 1):
             in_src.append(Input(shape=(1, len(dic_src))))
             out_src.append(
-                Embedding(len(dic_src), 500, input_length=2 * w + 1)(in_src[i])
+                Embedding(len(dic_src), 10, input_length=2 * w + 1)(in_src[i])
             )
         fully_con_src = concatenate(out_src)
 
         # output of fully connected layer
-        out_dense_src = Dense(500, activation="relu")(fully_con_src)
+        out_dense_src = Dense(10, activation="relu")(fully_con_src)
 
         in_tar = []
         out_tar = []
 
         for i in range(w):
             in_tar.append(Input(shape=(1, len(dic_tar))))
-            out_tar.append(Embedding(len(dic_tar), 500, input_length=w)(in_tar[i]))
+            out_tar.append(Embedding(len(dic_tar), 10, input_length=w)(in_tar[i]))
 
         fully_con_tar = concatenate(out_tar)
 
         # output of fully connected layer
-        out_dense_tar = Dense(500, activation="relu")(fully_con_tar)
+        out_dense_tar = Dense(10, activation="relu")(fully_con_tar)
 
         # concatenate output from src and tar in concat layer
         dense_concat = concatenate([out_dense_src, out_dense_tar])
 
         # fully connected layer 1
-        fully_connected_one = Dense(500, activation="relu")(dense_concat)
+        fully_connected_one = Dense(10, activation="relu")(dense_concat)
 
         # second fully connected layer / projection
-        fully_connected_two = Dense(500, activation=None)(fully_connected_one)
+        fully_connected_two = Dense(10, activation=None)(fully_connected_one)
 
         # softmax layer
         softmax_layer = keras.layers.Softmax()(fully_connected_two)
@@ -94,7 +95,9 @@ class Feedforward:
         self.model = Model(inputs=[in_src, in_tar], outputs=[softmax_layer])
 
     def compile_model(self):
-
+        """
+        compiles model
+        """
         self.model.compile(
             optimizer="SGD",
             loss=keras.losses.SparseCategoricalCrossentropy(from_logits=False),
@@ -115,7 +118,7 @@ def run_nn(sor_file, tar_file, window=2):
     batch = Batch()
     # BUG: REQ das Label muss während das lernen immer bekannt sein. S9 Architektur in letzte VL
     train_model = Feedforward()
-    train_model.build_model(2)
+    train_model.build_model(window)
     train_model.show_summary()
     train_model.compile_model()
 
@@ -137,23 +140,33 @@ def run_nn(sor_file, tar_file, window=2):
             continue
 
         # create one hot vectors for batch
-        src_window = tf.one_hot(batch.source, depth=len(dic_src))
-        tar_window = tf.one_hot(batch.target, depth=len(dic_tar))
+        # src_window = tf.one_hot(batch.source, depth=len(dic_src))
+        # tar_window = tf.one_hot(batch.target, depth=len(dic_tar))
         # labels = tf.one_hot(batch.label, depth=len(dic_tar))
 
         # use dataset to combine src tar (and labels - later?)
         # for now data.Dataset
         # creates tensors from lists
-        feed_src = tf.data.Dataset.from_tensor_slices(src_window)
-        feed_tar = tf.data.Dataset.from_tensor_slices(tar_window)
+        feed_src = tf.data.Dataset.from_tensor_slices(batch.source).batch(
+            batch_size=200
+        )
+        feed_tar = tf.data.Dataset.from_tensor_slices(batch.target).batch(
+            batch_size=200
+        )
 
-        # before proceeding note: perhaps TODO Batch Normalization S. 11 letzte VL
+        # transform integer values to one hot vectors
+        feed_src = feed_src.map(lambda x: tf.one_hot(x, depth=len(dic_src)))
+        feed_tar = feed_tar.map(lambda x: tf.one_hot(x, depth=len(dic_tar)))
 
         # uncomment following 2 lines to see the tensor shape
-        # for element in dataset:
-        #     print(element)
+        # running the model
+        for step, element in enumerate(feed_src):
+            logits = train_model.model(element, training=True)
+            print(logits)
 
         # run nn
+
+        # set batch to unfinished and work on next batch
         batch = unfinished
         break
 
