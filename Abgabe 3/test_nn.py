@@ -8,7 +8,7 @@ from tensorflow import keras
 from tensorflow.python.keras.layers.core import Dense
 import batches
 from batches import Batch, get_next_batch
-from tensorflow.keras.layers import Input, concatenate, Embedding
+from tensorflow.keras.layers import Input, Concatenate, Embedding
 from tensorflow.keras.models import Model
 
 # globals sit here.
@@ -46,22 +46,20 @@ class Feedforward:
         self.model = None
 
     # the model
-    def build_model(self, w):
+    def build_model(self, w=2):
         """
         build our neural network model
         """
-        dic_src = range(100)
-        dic_tar = range(100)
         integrate_gpu()
 
         in_src = []
         out_src = []
         for i in range(2 * w + 1):
-            in_src.append(Input(shape=(1, len(dic_src))))
+            in_src.append(Input(shape=(len(dic_src) ,1), name="I"+str(i)))
             out_src.append(
-                Embedding(len(dic_src), 10, input_length=2 * w + 1)(in_src[i])
+                Embedding(len(dic_src), 10, input_length=2*w+1)(in_src[i])
             )
-        fully_con_src = concatenate(out_src)
+        fully_con_src = Concatenate()(out_src)
 
         # output of fully connected layer
         out_dense_src = Dense(10, activation="relu")(fully_con_src)
@@ -70,16 +68,16 @@ class Feedforward:
         out_tar = []
 
         for i in range(w):
-            in_tar.append(Input(shape=(1, len(dic_tar))))
+            in_tar.append(Input(shape=(len(dic_tar), 1),name = "I"+str(2 * w + 1 +i)))
             out_tar.append(Embedding(len(dic_tar), 10, input_length=w)(in_tar[i]))
 
-        fully_con_tar = concatenate(out_tar)
-
+        fully_con_tar = Concatenate()(out_tar)
+        print("shit")
         # output of fully connected layer
         out_dense_tar = Dense(10, activation="relu")(fully_con_tar)
 
         # concatenate output from src and tar in concat layer
-        dense_concat = concatenate([out_dense_src, out_dense_tar])
+        dense_concat = Concatenate(axis = 1)([out_dense_src, out_dense_tar])
 
         # fully connected layer 1
         fully_connected_one = Dense(10, activation="relu")(dense_concat)
@@ -88,11 +86,11 @@ class Feedforward:
         fully_connected_two = Dense(10, activation=None)(fully_connected_one)
 
         # softmax layer
-        softmax_layer = keras.layers.Softmax()(fully_connected_two)
+        softmax_layer = keras.layers.Softmax(axis = 0, name = "O")(fully_connected_two)
 
         # in1 = in_src.extend(in_tar)
         # build final model
-        self.model = Model(inputs=[in_src, in_tar], outputs=[softmax_layer])
+        self.model = Model(inputs = [in_tar, in_src] , outputs=softmax_layer)
 
     def compile_model(self):
         """
@@ -117,10 +115,6 @@ def feeder(batch):
 def run_nn(sor_file, tar_file, window=2):
     batch = Batch()
     # BUG: REQ das Label muss während das lernen immer bekannt sein. S9 Architektur in letzte VL
-    train_model = Feedforward()
-    train_model.build_model(window)
-    train_model.show_summary()
-    train_model.compile_model()
 
     # store source and target file as list of words
     src = ut.read_from_file(sor_file)
@@ -128,6 +122,11 @@ def run_nn(sor_file, tar_file, window=2):
 
     source, target = batches.get_word_index(src, trg)
     batch, unfinished = Batch(), Batch()
+   
+    train_model = Feedforward()
+    train_model.build_model(window)
+    train_model.show_summary()
+    train_model.compile_model()
 
     # running model on the fly
     for s, t in zip(source, target):
@@ -147,22 +146,22 @@ def run_nn(sor_file, tar_file, window=2):
         # use dataset to combine src tar (and labels - later?)
         # for now data.Dataset
         # creates tensors from lists
-        feed_src = tf.data.Dataset.from_tensor_slices(batch.source).batch(
-            batch_size=200
-        )
-        feed_tar = tf.data.Dataset.from_tensor_slices(batch.target).batch(
-            batch_size=200
-        )
+        feed_src = tf.data.Dataset.from_tensor_slices(batch.source)
+        feed_tar = tf.data.Dataset.from_tensor_slices(batch.target)
 
         # transform integer values to one hot vectors
         feed_src = feed_src.map(lambda x: tf.one_hot(x, depth=len(dic_src)))
         feed_tar = feed_tar.map(lambda x: tf.one_hot(x, depth=len(dic_tar)))
 
+        output_tar = tf.data.Dataset.from_tensor_slices(batch.label)
+        output_tar = output_tar.map(lambda x: tf.one_hot(x, depth=len(dic_tar)))
+
+        for step, (src, tar, out) in enumerate(zip(feed_src, feed_tar, output_tar)):
+            input_dic = {"I0": src[0],"I1": src[1],"I2": src[2],"I3": src[3],"I4": src[4],"I5": tar[0],"I6": tar[1]}
+            #print(input_dic)
+            train_model.model(input_dic,out)
         # uncomment following 2 lines to see the tensor shape
         # running the model
-        for step, element in enumerate(feed_src):
-            logits = train_model.model(element, training=True)
-            print(logits)
 
         # run nn
 
