@@ -55,42 +55,41 @@ class Feedforward:
         in_src = []
         out_src = []
         for i in range(2 * w + 1):
-            in_src.append(Input(shape=(len(dic_src) ,1), name="I"+str(i)))
+            in_src.append(Input(shape=(len(dic_src),), name="I"+str(i)))
             out_src.append(
                 Embedding(len(dic_src), 10, input_length=2*w+1)(in_src[i])
             )
         fully_con_src = Concatenate()(out_src)
 
         # output of fully connected layer
-        out_dense_src = Dense(10, activation="relu")(fully_con_src)
+        out_dense_src = Dense(100, activation="relu")(fully_con_src)
 
         in_tar = []
         out_tar = []
 
         for i in range(w):
-            in_tar.append(Input(shape=(len(dic_tar), 1),name = "I"+str(2 * w + 1 +i)))
+            in_tar.append(Input(shape=(len(dic_tar),), name = "I"+str(2 * w + 1 +i)))
             out_tar.append(Embedding(len(dic_tar), 10, input_length=w)(in_tar[i]))
 
         fully_con_tar = Concatenate()(out_tar)
-        print("shit")
         # output of fully connected layer
-        out_dense_tar = Dense(10, activation="relu")(fully_con_tar)
+        out_dense_tar = Dense(100, activation="relu")(fully_con_tar)
 
         # concatenate output from src and tar in concat layer
         dense_concat = Concatenate(axis = 1)([out_dense_src, out_dense_tar])
 
         # fully connected layer 1
-        fully_connected_one = Dense(10, activation="relu")(dense_concat)
+        fully_connected_one = Dense(100, activation="relu")(dense_concat)
 
         # second fully connected layer / projection
-        fully_connected_two = Dense(10, activation=None)(fully_connected_one)
+        fully_connected_two = Dense(100, activation=None, input_shape = (len(dic_tar),))(fully_connected_one)
 
         # softmax layer
-        softmax_layer = keras.layers.Softmax(axis = 0, name = "O")(fully_connected_two)
+        softmax_layer = Dense(100,activation = "softmax",name = "O")(fully_connected_two)
 
         # in1 = in_src.extend(in_tar)
         # build final model
-        self.model = Model(inputs = [in_tar, in_src] , outputs=softmax_layer)
+        self.model = Model(inputs = [in_src + in_tar] , outputs=[softmax_layer])
 
     def compile_model(self):
         """
@@ -99,7 +98,7 @@ class Feedforward:
         self.model.compile(
             optimizer="SGD",
             loss=keras.losses.SparseCategoricalCrossentropy(from_logits=False),
-            metrics=["accuracy", "perplexity"],
+            metrics=["accuracy"],
         )
 
         # model.fit()
@@ -146,21 +145,33 @@ def run_nn(sor_file, tar_file, window=2):
         # use dataset to combine src tar (and labels - later?)
         # for now data.Dataset
         # creates tensors from lists
-        feed_src = tf.data.Dataset.from_tensor_slices(batch.source)
-        feed_tar = tf.data.Dataset.from_tensor_slices(batch.target)
+        feed_src = tf.one_hot(np.array(batch.source),depth = len(dic_src))
+        feed_tar = tf.one_hot(np.array(batch.target),depth = len(dic_tar))
 
-        # transform integer values to one hot vectors
-        feed_src = feed_src.map(lambda x: tf.one_hot(x, depth=len(dic_src)))
-        feed_tar = feed_tar.map(lambda x: tf.one_hot(x, depth=len(dic_tar)))
+        # feed_src = feed_src.map(lambda x: tf.one_hot(x, depth=len(dic_src)))
+        # feed_tar = feed_tar.map(lambda x: tf.one_hot(x, depth=len(dic_tar)))
+        # feed_zip = tf.data.Dataset.zip((feed_src,feed_tar))
+        output_tar = tf.one_hot(np.array(batch.label),depth = len(dic_tar)+len(dic_src))
 
-        output_tar = tf.data.Dataset.from_tensor_slices(batch.label)
-        output_tar = output_tar.map(lambda x: tf.one_hot(x, depth=len(dic_tar)))
+        # input_src = np.array(feed_src)
+        # input_tar = np.array(feed_tar)
+        input_list = {}
 
-        for step, (src, tar, out) in enumerate(zip(feed_src, feed_tar, output_tar)):
-            input_dic = {"I0": src[0],"I1": src[1],"I2": src[2],"I3": src[3],"I4": src[4],"I5": tar[0],"I6": tar[1]}
-            #print(input_dic)
-            train_model.model(input_dic,out)
-        # uncomment following 2 lines to see the tensor shape
+
+        for i in range(2*window+1):
+            input_list["I"+str(i)] = feed_src[:,i]
+        
+        for i in range(window):
+            input_list["I"+str(i+2*window+1)] = feed_tar[:,i]
+
+        history = train_model.model.fit(input_list, output_tar, batch_size = 1, epochs = 1)
+        print(history.history)
+        # for step, (src, tar, out) in enumerate(zip(feed_src, feed_tar, output_tar)):
+        #     input_list = [np.array(src)]
+        #     for element in tar:
+        #         input_list.append(np.array(element))
+        #     train_model.model.fit([input_list],[out])
+        # # uncomment following 2 lines to see the tensor shape
         # running the model
 
         # run nn
