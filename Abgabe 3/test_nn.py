@@ -82,10 +82,10 @@ class Feedforward:
         fully_connected_one = Dense(100, activation="relu")(dense_concat)
 
         # second fully connected layer / projection
-        fully_connected_two = Dense(100, activation=None, input_shape = (len(dic_tar),))(fully_connected_one)
+        fully_connected_two = Dense(100, activation=None, input_shape = (len(dic_tar),1))(fully_connected_one)
 
         # softmax layer
-        softmax_layer = Dense(100,activation = "softmax",name = "O")(fully_connected_two)
+        softmax_layer = Dense(2, activation = "softmax",name = "O")(fully_connected_two)
 
         # in1 = in_src.extend(in_tar)
         # build final model
@@ -152,7 +152,7 @@ def run_nn(sor_file, tar_file, window=2):
         # feed_tar = feed_tar.map(lambda x: tf.one_hot(x, depth=len(dic_tar)))
         # feed_zip = tf.data.Dataset.zip((feed_src,feed_tar))
         output_tar = tf.one_hot(np.array(batch.label),depth = len(dic_tar)+len(dic_src))
-
+        output_tar = tf.reshape(output_tar,(200,1,len(dic_tar)+len(dic_src)))
         # input_src = np.array(feed_src)
         # input_tar = np.array(feed_tar)
         input_list = {}
