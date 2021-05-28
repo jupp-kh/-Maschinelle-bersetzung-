@@ -14,6 +14,8 @@ from dictionary import dic_src, dic_tar
 from utility import cur_dir
 from tensorflow.python.keras.backend import _LOCAL_DEVICES
 
+# loading tensorboard
+# %load_ext tensorboard
 
 # NOTE: using loop to do the feed forward is slow because loops in py are inefficient.
 #   -> use %timeit !?
@@ -49,7 +51,7 @@ class Feedforward:
         for i in range(2 * w + 1):
             in_src.append(Input(shape=(len(dic_src),), name="I" + str(i)))
             out_src.append(
-                Embedding(len(dic_src), 10, input_length=2 * w + 1)(in_src[i])
+                Embedding(len(dic_src), 10, input_length=len(dic_src))(in_src[i])
             )
         fully_con_src = Concatenate()(out_src)
 
@@ -61,11 +63,15 @@ class Feedforward:
 
         for i in range(w):
             in_tar.append(Input(shape=(len(dic_tar),), name="I" + str(2 * w + 1 + i)))
-            out_tar.append(Embedding(len(dic_tar), 10, input_length=w)(in_tar[i]))
+            out_tar.append(
+                Embedding(len(dic_tar), 10, input_length=len(dic_tar))(in_tar[i])
+            )
 
         fully_con_tar = Concatenate()(out_tar)
         # output of fully connected layer
-        out_dense_tar = Dense(100, activation="relu")(fully_con_tar)
+        out_dense_tar = Dense(100, activation="relu", kernel_initializer="he_normal")(
+            fully_con_tar
+        )
 
         # concatenate output from src and tar in concat layer
         dense_concat = Concatenate(axis=1)([out_dense_src, out_dense_tar])
@@ -89,11 +95,17 @@ class Feedforward:
         """
         compiles model
         """
+        from tensorflow.keras.optimizers import RMSprop
+
         self.model.compile(
-            optimizer="SGD",
-            loss=crossentropy,
+            optimizer=RMSprop(learning_rate=0.0001),
+            loss="mse",
             # using categorical cross entropy from keras provided one-hot vectors
-            metrics=["accuracy", crossentropy, perplexity],
+            metrics=[
+                "accuracy",
+                perplexity,
+                tf.keras.metrics.CategoricalCrossentropy(),
+            ],
         )
 
     def show_summary(self):
@@ -119,11 +131,10 @@ def run_nn(sor_file, tar_file, window=2):
     train_model.build_model(window)
     train_model.show_summary()
     train_model.compile_model()
-    stopper = 0
+
     # running model on the fly
     for s, t in zip(source, target):
         # DONE FIXME: error due to batch < 200
-
         batch, unfinished = get_next_batch(batch, s, t, window)
 
         # get next lines to assure batch size exceeds 200 lines
@@ -157,7 +168,12 @@ def run_nn(sor_file, tar_file, window=2):
 
         # run nn training with fit
         # FIXME by using fit we assume our entire dataset is fitted which is incorrect: maybe use fit_generator or train_on_batch
-        history = train_model.model.fit(input_list, output_tar, batch_size=1, epochs=1)
+        history = train_model.model.fit(
+            x=input_list,
+            y=output_tar,
+            batch_size=20,
+            epochs=5,
+        )
 
         # print the returned metrics from our method
         # TODO metriken wir accuracy und perplexity in regelmäßgen Abständen auszugeben

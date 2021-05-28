@@ -18,7 +18,7 @@ def crossentropy(labels, logits):
     """
     computes loss function with sparse categorical crossentropy
     """
-    return tf.keras.losses.categorical_crossentropy(labels, logits, from_logits=True)
+    return tf.keras.losses.categorical_crossentropy(labels, logits, from_logits=False)
 
 
 def perplexity(labels, logits):
@@ -42,7 +42,6 @@ class ExtModel(tf.keras.Model):
         # split data into inputs and outputs
         x, y = data
 
-        # print(x)
         # print(tf.keras.backend.get_value(y))
         # Gradient Tape tracks the automatic differentiation that occurs in a TF model.
         # its context records computations to get the gradient of any tensor computed
