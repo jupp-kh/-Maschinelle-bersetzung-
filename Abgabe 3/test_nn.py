@@ -2,31 +2,24 @@ import tensorflow as tf
 import numpy as np
 import utility as ut
 import os
-from tensorflow import keras
 from tensorflow.python.keras.layers.core import Dense
 import batches
 from batches import Batch, get_next_batch
 from tensorflow.keras.layers import Input, Concatenate, Embedding
 from tensorflow.keras.models import Model
-from custom_model import ExtModel, crossentropy, perplexity
 
 # globals sit here.
+from custom_model import ExtModel, crossentropy, perplexity
 from dictionary import dic_src, dic_tar
 from utility import cur_dir
 from tensorflow.python.keras.backend import _LOCAL_DEVICES
 
 
-# Steps for feed forward network
-# we set batches, say a sample matrix of size 3x3
-# add weights for layers.
-#   could be done using numpy arrays, because of their additional functionality
-# set up an activation function in beforehand
 # NOTE: using loop to do the feed forward is slow because loops in py are inefficient.
 #   -> use %timeit !?
 
-# Architektur aus der Vorlesung
+######################## Adapted Architecture ########################
 # input layer: src window - target window
-#       f[b(i-w): b(i+w)] -
 # feste Größe N=200
 # zur Darstellung des Vokabulars wird one hot vector benötigt
 # Fully connected source  - fully connected target
@@ -90,7 +83,7 @@ class Feedforward:
 
         # in1 = in_src.extend(in_tar)
         # build final model
-        self.model = ExtModel(inputs=[in_src + in_tar], outputs=[softmax_layer])
+        self.model = Model(inputs=[in_src + in_tar], outputs=[softmax_layer])
 
     def compile_model(self):
         """
@@ -99,6 +92,7 @@ class Feedforward:
         self.model.compile(
             optimizer="SGD",
             loss=crossentropy,
+            # using categorical cross entropy from keras provided one-hot vectors
             metrics=["accuracy", crossentropy, perplexity],
         )
 
@@ -125,7 +119,7 @@ def run_nn(sor_file, tar_file, window=2):
     train_model.build_model(window)
     train_model.show_summary()
     train_model.compile_model()
-
+    stopper = 0
     # running model on the fly
     for s, t in zip(source, target):
         # DONE FIXME: error due to batch < 200
@@ -136,7 +130,7 @@ def run_nn(sor_file, tar_file, window=2):
         if batch.size < 200:
             continue
 
-        # NEXT: try use dataset to combine src tar (and labels - result)
+        # TODO NEXT: try use dataset to combine src tar (and labels - result)
         # for now data.Dataset
         # creates tensors from lists
         feed_src = tf.one_hot(np.array(batch.source), depth=len(dic_src))
@@ -151,6 +145,8 @@ def run_nn(sor_file, tar_file, window=2):
         # output_tar = tf.reshape(output_tar, (200, 1, len(dic_tar) + len(dic_src)))
         # input_src = np.array(feed_src)
         # input_tar = np.array(feed_tar)
+
+        # dictionary to specify inputs at each input point in NN
         input_list = {}
 
         for i in range(2 * window + 1):
@@ -159,17 +155,22 @@ def run_nn(sor_file, tar_file, window=2):
         for i in range(window):
             input_list["I" + str(i + 2 * window + 1)] = feed_tar[:, i]
 
-        history = train_model.model.fit(input_list, output_tar, batch_size=1, epochs=2)
-        print(history.history)
+        # run nn training with fit
+        # FIXME by using fit we assume our entire dataset is fitted which is incorrect: maybe use fit_generator or train_on_batch
+        history = train_model.model.fit(input_list, output_tar, batch_size=1, epochs=1)
 
-        # run nn
+        # print the returned metrics from our method
+        # TODO metriken wir accuracy und perplexity in regelmäßgen Abständen auszugeben
+        print(history.history)
 
         # set batch to unfinished and work on next batch
         batch = unfinished
-        break
 
 
 def integrate_gpu():
+    """
+    Method to check whether gpu should remain integrated
+    """
     if not _LOCAL_DEVICES:
         os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 

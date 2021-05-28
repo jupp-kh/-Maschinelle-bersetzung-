@@ -18,7 +18,7 @@ def crossentropy(labels, logits):
     """
     computes loss function with sparse categorical crossentropy
     """
-    return tf.keras.losses.categorical_crossentropy(labels, logits, from_logits=False)
+    return tf.keras.losses.categorical_crossentropy(labels, logits, from_logits=True)
 
 
 def perplexity(labels, logits):
