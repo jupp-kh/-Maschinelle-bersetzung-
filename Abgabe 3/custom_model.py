@@ -9,7 +9,7 @@ from batches import Batch, get_next_batch
 from tensorflow.keras.layers import Input, Concatenate, Embedding
 from tensorflow.keras.models import Model
 from dictionary import dic_tar, dic_src
-
+import os
 
 from tensorflow.python.ops.variables import trainable_variables
 
@@ -21,8 +21,16 @@ from tensorflow.python.ops.variables import trainable_variables
 
 
 class ExtCallback(tf.keras.callbacks.Callback):
-    def on_train_batch_end(self, batch, logs):
-        return super().on_train_batch_end(batch, logs=logs)
+    def __init__(self, display):
+        self.seen = 0
+        self.display = display
+
+    def on_batch_end(self, batch, logs):
+        self.seen += logs.get("size", 0)
+        print(logs)
+        print("perplexity:", int(tf.exp(logs["loss"]).numpy()))
+        if self.seen % self.display:
+            print("\n{}\{} - loss .... \n".format(self.seen, logs.keys()))
 
 
 # use this rather than calling sparse_categorical_crossentropy
@@ -147,7 +155,6 @@ class Modell:
             # using categorical cross entropy from keras provided one-hot vectors
             metrics=[
                 "accuracy",
-                perplexity,
             ],
         )
 

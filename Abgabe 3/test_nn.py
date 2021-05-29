@@ -120,9 +120,12 @@ def run_nn(sor_file, tar_file, window=2):
     src = ut.read_from_file(sor_file)
     trg = ut.read_from_file(tar_file)
 
+    # get word mapping for both source and index files
     source, target = batches.get_word_index(src, trg)
     batch = get_all_batches(source, target, window)
 
+    # Modell is a sub class from keras.Model()
+    # Modell() in custom_model.py
     train_model = Modell()
     train_model.build_model(window)
     train_model.show_summary()
@@ -167,12 +170,13 @@ def run_nn(sor_file, tar_file, window=2):
 
     # run nn training with fit
     # FIXME by using fit we assume our entire dataset is fitted which is incorrect: maybe use fit_generator or train_on_batch
-    callme = ExtCallback()
+    callme = ExtCallback(100)
     history = train_model.model.fit(
         dataset,
         epochs=5,
-        callbacks=callme,
+        callbacks=[callme],
         batch_size=200,
+        verbose=0,
         # validation_data=(input_list, output_tar),
     )
 
