@@ -12,7 +12,7 @@ from tensorflow.keras.layers import Input, Concatenate, Embedding
 from tensorflow.keras.models import Model
 
 # globals sit here.
-from custom_model import crossentropy, perplexity, Modell, ExtCallback
+from custom_model import Modell, ExtCallback
 from dictionary import dic_src, dic_tar
 from utility import cur_dir
 from tensorflow.python.keras.backend import _LOCAL_DEVICES
@@ -100,11 +100,10 @@ class Feedforward:
 
         self.model.compile(
             optimizer=SGD(lr=0.01),
-            loss=crossentropy,
+            loss="mse",
             # using categorical cross entropy from keras provided one-hot vectors
             metrics=[
                 "accuracy",
-                perplexity,
             ],
         )
 
