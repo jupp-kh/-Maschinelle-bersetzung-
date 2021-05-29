@@ -1,16 +1,18 @@
 """
-Creates Class ExtModel 
+Contains class ExtModel implement Model
+Contains implementation of keras.callbacks.Callback: ExtCallback 
+Contains metric class Perplexity
+
+* Contains network archictecture for word embedding: Modell
 """
 import tensorflow as tf
 import numpy as np
 from tensorflow.python.keras.engine import data_adapter
 from tensorflow.python.keras.layers.core import Dense
 import batches
-from batches import Batch, get_next_batch
 from tensorflow.keras.layers import Input, Concatenate, Embedding
 from tensorflow.keras.models import Model
 from dictionary import dic_tar, dic_src
-import os
 
 from tensorflow.python.ops.variables import trainable_variables
 
@@ -27,14 +29,14 @@ class Perplexity(tf.keras.metrics.Metric):
         self.cross_entropy = tf.keras.losses.CategoricalCrossentropy(from_logits=False)
         self.perplexity = self.add_weight(name="tp", initializer="zeros")
 
-    def _calculate_perplexity(self, labels, logits):
+    def _calculate_perplexity(self, y_true, y_pred):
         """
         Method returns perplexity
         """
-        perplexity = tf.keras.backend.exp(self.cross_entropy(labels, logits))
+        perplexity = tf.keras.backend.exp(self.cross_entropy(y_true, y_pred))
         return perplexity
 
-    def update_state(self, labels, logits, sample_weight=0):
+    def update_state(self, y_true, y_pred, sample_weight=0):
         if sample_weight is not None:
             self.log(
                 self.WARNING,
@@ -43,14 +45,14 @@ class Perplexity(tf.keras.metrics.Metric):
             )
 
         # Remember self.perplexity is a tensor (tf.Variable),
-        self.perplexity = self._calculate_perplexity(labels, logits)
+        self.perplexity = self._calculate_perplexity(y_true, y_pred)
 
     def result(self):
         return self.perplexity
 
     def reset_states(self):
         # The state of the metric will be reset at the start of each epoch.
-        self.perplexity.assign(0.0)
+        self.perplexity = tf.Variable(0)
 
 
 class ExtCallback(tf.keras.callbacks.Callback):
@@ -75,10 +77,8 @@ class ExtModel(tf.keras.Model):
         static variables for saving certain informational
         attributes required by users
         """
-        # split data into inputs and outputs
-        # data = data_adapter.expand_1d(data)
+        # split dataset and convert y to a one_hot representative
         x, y = data
-
         ### This line is necessary
         y = tf.one_hot(y, depth=len(dic_tar))
 
@@ -107,7 +107,7 @@ class ExtModel(tf.keras.Model):
         return return_metrics
 
 
-class Modell:
+class FeedForward:
     """
     Class for our feed forward network
     """
@@ -124,14 +124,11 @@ class Modell:
 
         input_point_1 = Input(shape=(2 * w + 1,), name="I0")
 
-        x = Embedding(
-            len(dic_src),
-            100,
-        )(input_point_1)
+        x = Embedding(len(dic_src), 200)(input_point_1)
         x = Dense(units=200, activation="relu", name="FullyConSource")(x)
 
         input_point_2 = Input(shape=(w,), name="I1")
-        y = Embedding(len(dic_tar), 100, name="EmbeddedTarget")(input_point_2)
+        y = Embedding(len(dic_tar), 200, name="EmbeddedTarget")(input_point_2)
         y = Dense(units=200, activation="relu", name="FullyConTarget")(y)
 
         fully_concat = Concatenate(axis=1, name="ConcatLayer")([x, y])
@@ -172,6 +169,109 @@ class Modell:
             metrics=[
                 "accuracy",
                 Perplexity(),
+            ],
+        )
+
+    def show_summary(self):
+        print(self.model.summary())
+
+
+######### Another prototype model #########
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#   Prototype might be unnecessary
+#   Could use ExtModel instead
+#   add build and compile to it and
+#   create its python file
+#
+#
+#
+#
+#
+#
+#
+#
+# implements architecture differently
+
+
+class Prototype:
+    """
+    Class for our feed forward network
+    """
+
+    def __init__(self):
+        self.model = None
+
+    # the model
+    def build_model(self, w=2):
+        """
+        build our neural network model
+        """
+
+        in_src = []
+        out_src = []
+        for i in range(2 * w + 1):
+            in_src.append(Input(shape=(len(dic_src),), name="I" + str(i)))
+            out_src.append(
+                Embedding(len(dic_src), 10, input_length=len(dic_src))(in_src[i])
+            )
+        fully_con_src = Concatenate()(out_src)
+
+        # output of fully connected layer
+        out_dense_src = Dense(100, activation="relu")(fully_con_src)
+
+        in_tar = []
+        out_tar = []
+
+        for i in range(w):
+            in_tar.append(Input(shape=(len(dic_tar),), name="I" + str(2 * w + 1 + i)))
+            out_tar.append(
+                Embedding(len(dic_tar), 10, input_length=len(dic_tar))(in_tar[i])
+            )
+
+        fully_con_tar = Concatenate()(out_tar)
+        # output of fully connected layer
+        out_dense_tar = Dense(100, activation="relu")(fully_con_tar)
+
+        # concatenate output from src and tar in concat layer
+        dense_concat = Concatenate(axis=1)([out_dense_src, out_dense_tar])
+
+        # fully connected layer 1
+        fully_connected_one = Dense(100, activation="relu")(dense_concat)
+
+        # second fully connected layer / projection
+        fully_connected_two = Dense(
+            100, activation=None, input_shape=(len(dic_tar), 1)
+        )(fully_connected_one)
+
+        # softmax layer
+        softmax_layer = Dense(1, activation="softmax", name="O")(fully_connected_two)
+
+        # in1 = in_src.extend(in_tar)
+        # build final model
+        self.model = Model(inputs=[in_src + in_tar], outputs=[softmax_layer])
+
+    def compile_model(self):
+        """
+        compiles model
+        """
+        from tensorflow.keras.optimizers import SGD
+
+        self.model.compile(
+            optimizer=SGD(lr=0.01),
+            loss="mse",
+            # using categorical cross entropy from keras provided one-hot vectors
+            metrics=[
+                "accuracy",
             ],
         )
 
