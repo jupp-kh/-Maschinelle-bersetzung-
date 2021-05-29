@@ -41,12 +41,12 @@ def loader():
 
 # this method reads from file datei
 # returns a list of read file lines
-## FIXME i cant understand deutsch 
+## FIXME i cant understand deutsch
 def read_from_file(datei, start=0, end=-1):
     with open(datei, "r", encoding="utf-8") as in_file:
         res = []
         lines = in_file.readlines()
-        
+
         if end == -1:
             end = len(lines)
 
@@ -55,6 +55,7 @@ def read_from_file(datei, start=0, end=-1):
             if i in range(start, end):
                 res.append(line.strip())
     return res
+
 
 def save_as_csv(file_des, data):
     try:
@@ -68,11 +69,12 @@ def save_as_csv(file_des, data):
             writer.writerow([x])
     file_csv.close()
 
+
 def save_as_txt(file_des, data):
     try:
         os.remove(file_des)
     except:
         print("No file, creating new file")
-    
+
     with open(file_des, "x", encoding="utf-8") as write_f:
         write_f.write(data)

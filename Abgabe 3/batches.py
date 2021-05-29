@@ -251,6 +251,13 @@ def get_next_batch(batch, s, t, w=2):
     return batch, None
 
 
+def get_all_batches(source, target, w):
+    batch = Batch()
+    for s, t in zip(source, target):
+        batch = create_batch(batch, s, t, w)
+    return batch
+
+
 def main():
     # call method
     create_batches(

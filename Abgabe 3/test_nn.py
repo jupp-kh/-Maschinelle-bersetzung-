@@ -1,15 +1,18 @@
+from encoder import run_bpe
 import tensorflow as tf
 import numpy as np
+from tensorflow._api.v2 import data
+from tensorflow.python.ops.gen_dataset_ops import dataset_to_graph_v2
 import utility as ut
 import os
 from tensorflow.python.keras.layers.core import Dense
 import batches
-from batches import Batch, get_next_batch
+from batches import Batch, get_next_batch, get_all_batches
 from tensorflow.keras.layers import Input, Concatenate, Embedding
 from tensorflow.keras.models import Model
 
 # globals sit here.
-from custom_model import ExtModel, crossentropy, perplexity
+from custom_model import crossentropy, perplexity, Modell, ExtCallback
 from dictionary import dic_src, dic_tar
 from utility import cur_dir
 from tensorflow.python.keras.backend import _LOCAL_DEVICES
@@ -69,9 +72,7 @@ class Feedforward:
 
         fully_con_tar = Concatenate()(out_tar)
         # output of fully connected layer
-        out_dense_tar = Dense(100, activation="relu", kernel_initializer="he_normal")(
-            fully_con_tar
-        )
+        out_dense_tar = Dense(100, activation="relu")(fully_con_tar)
 
         # concatenate output from src and tar in concat layer
         dense_concat = Concatenate(axis=1)([out_dense_src, out_dense_tar])
@@ -95,25 +96,20 @@ class Feedforward:
         """
         compiles model
         """
-        from tensorflow.keras.optimizers import RMSprop
+        from tensorflow.keras.optimizers import SGD
 
         self.model.compile(
-            optimizer=RMSprop(learning_rate=0.0001),
-            loss="mse",
+            optimizer=SGD(lr=0.01),
+            loss=crossentropy,
             # using categorical cross entropy from keras provided one-hot vectors
             metrics=[
                 "accuracy",
                 perplexity,
-                tf.keras.metrics.CategoricalCrossentropy(),
             ],
         )
 
     def show_summary(self):
         print(self.model.summary())
-
-
-def feeder(batch):
-    pass
 
 
 def run_nn(sor_file, tar_file, window=2):
@@ -125,62 +121,64 @@ def run_nn(sor_file, tar_file, window=2):
     trg = ut.read_from_file(tar_file)
 
     source, target = batches.get_word_index(src, trg)
-    batch, unfinished = Batch(), Batch()
+    batch = get_all_batches(source, target, window)
 
-    train_model = Feedforward()
+    train_model = Modell()
     train_model.build_model(window)
     train_model.show_summary()
     train_model.compile_model()
+    # # running model on the fly
+    # for s, t in zip(source, target):
+    #     batch, unfinished = get_next_batch(batch, s, t, window)
 
-    # running model on the fly
-    for s, t in zip(source, target):
-        # DONE FIXME: error due to batch < 200
-        batch, unfinished = get_next_batch(batch, s, t, window)
+    #     # get next lines to assure batch size exceeds 200 lines
+    #     if batch.size < 200:
+    #         continue
 
-        # get next lines to assure batch size exceeds 200 lines
-        if batch.size < 200:
-            continue
+    #     # TODO NEXT: try use dataset to combine src tar (and labels - result)
+    #     # data.Dataset
+    #     # creates tensors from lists
+    feed_src = np.array(batch.source)
+    feed_tar = np.array(batch.target)
 
-        # TODO NEXT: try use dataset to combine src tar (and labels - result)
-        # for now data.Dataset
-        # creates tensors from lists
-        feed_src = tf.one_hot(np.array(batch.source), depth=len(dic_src))
-        feed_tar = tf.one_hot(np.array(batch.target), depth=len(dic_tar))
+    #     # feed_src = feed_src.map(lambda x: tf.one_hot(x, depth=len(dic_src)))
+    #     # feed_tar = feed_tar.map(lambda x: tf.one_hot(x, depth=len(dic_tar)))
+    #     # feed_zip = tf.data.Dataset.zip((feed_src,feed_tar))
+    output_tar = []
+    # for step, elem in enumerate(batch.label):
+    #     output_tar.append(tf.one_hot(elem, depth=len(dic_tar)))
+    output_tar = np.array(batch.label)
+    #     # output_tar = tf.reshape(output_tar, (200, 1, len(dic_tar) + len(dic_src)))
+    #  input_src = np.array(feed_src)
+    # input_tar = np.array(feed_tar)
 
-        # feed_src = feed_src.map(lambda x: tf.one_hot(x, depth=len(dic_src)))
-        # feed_tar = feed_tar.map(lambda x: tf.one_hot(x, depth=len(dic_tar)))
-        # feed_zip = tf.data.Dataset.zip((feed_src,feed_tar))
-        output_tar = tf.one_hot(
-            np.array(batch.label), depth=len(dic_tar) + len(dic_src)
-        )
-        # output_tar = tf.reshape(output_tar, (200, 1, len(dic_tar) + len(dic_src)))
-        # input_src = np.array(feed_src)
-        # input_tar = np.array(feed_tar)
+    #     # dictionary to specify inputs at each input point in NN
+    input_list = {"I0": feed_src, "I1": feed_tar}
+    dataset = tf.data.Dataset.from_tensor_slices(input_list)
 
-        # dictionary to specify inputs at each input point in NN
-        input_list = {}
+    data_set = tf.data.Dataset.from_tensor_slices(output_tar)
+    dataset = tf.data.Dataset.zip((dataset, data_set)).batch(200, drop_remainder=True)
 
-        for i in range(2 * window + 1):
-            input_list["I" + str(i)] = feed_src[:, i]
+    # for i in range(2 * window + 1):
+    #     input_list["I" + str(i)] = feed_src[:, i]
 
-        for i in range(window):
-            input_list["I" + str(i + 2 * window + 1)] = feed_tar[:, i]
+    # for i in range(window):
+    #     input_list["I" + str(i + 2 * window + 1)] = feed_tar[:, i]
 
-        # run nn training with fit
-        # FIXME by using fit we assume our entire dataset is fitted which is incorrect: maybe use fit_generator or train_on_batch
-        history = train_model.model.fit(
-            x=input_list,
-            y=output_tar,
-            batch_size=20,
-            epochs=5,
-        )
+    # run nn training with fit
+    # FIXME by using fit we assume our entire dataset is fitted which is incorrect: maybe use fit_generator or train_on_batch
+    callme = ExtCallback()
+    history = train_model.model.fit(
+        dataset,
+        epochs=5,
+        callbacks=callme,
+        batch_size=200,
+        # validation_data=(input_list, output_tar),
+    )
 
-        # print the returned metrics from our method
-        # TODO metriken wir accuracy und perplexity in regelmäßgen Abständen auszugeben
-        print(history.history)
-
-        # set batch to unfinished and work on next batch
-        batch = unfinished
+    # print the returned metrics from our method
+    # TODO metriken wir accuracy und perplexity in regelmäßgen Abständen auszugeben
+    print(history.history)
 
 
 def integrate_gpu():
@@ -192,10 +190,13 @@ def integrate_gpu():
 
 
 def main():
+    # running BPE with 7k operations on dev text
+    # run_bpe(7000)
+
     ## Run neural network
     run_nn(
-        os.path.join(cur_dir, "data_exercise_3", "multi30k.en"),
-        os.path.join(cur_dir, "data_exercise_3", "multi30k.de"),
+        os.path.join(cur_dir, "output", "multi30k_subword.en"),
+        os.path.join(cur_dir, "output", "multi30k_subword.de"),
     )
 
 
