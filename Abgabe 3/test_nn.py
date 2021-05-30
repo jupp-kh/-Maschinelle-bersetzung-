@@ -53,7 +53,7 @@ def validate_by_evaluate(train_model, val_data, cp_freq=1000, tb_vis=False):
     # callback
     early_stopping = tf.keras.callbacks.EarlyStopping(
         # monitor defines which metric we are monitoring
-        monitor="acc",
+        monitor="accuracy",
         # how many evaluations of no improvement do we wait until we change the LR (learning rate)
         patience=3,
         restore_best_weights=True,
@@ -110,9 +110,9 @@ def train_by_fit(
     # callback for reducing the learningrate if metrics stagnate on validation data
     learning_rate_reduction = tf.keras.callbacks.ReduceLROnPlateau(
         # monitor defines which metric we are monitoring
-        monitor="val_acc",
+        monitor="accuracy",
         # how many evaluations of no improvement do we wait until we change the LR (learning rate)
-        patience=3,
+        patience=1,
         verbose=1,
         # factor to cut the LR in half
         factor=0.5,
@@ -122,7 +122,7 @@ def train_by_fit(
     # callback
     early_stopping = tf.keras.callbacks.EarlyStopping(
         # monitor defines which metric we are monitoring
-        monitor="acc",
+        monitor="accuracy",
         # how many evaluations of no improvement do we wait until we change the LR (learning rate)
         patience=3,
         restore_best_weights=True,
