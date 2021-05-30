@@ -1,3 +1,4 @@
+from tensorflow.python.training.saving import checkpoint_options
 from encoder import run_bpe
 import tensorflow as tf
 import numpy as np
@@ -10,6 +11,7 @@ import batches
 from batches import Batch, get_next_batch, get_all_batches
 from tensorflow.keras.layers import Input, Concatenate, Embedding
 from tensorflow.keras.models import Model
+import sys
 
 # globals sit here.
 from custom_model import FeedForward, ExtCallback
@@ -34,6 +36,26 @@ from tensorflow.python.keras.backend import _LOCAL_DEVICES
 # Ausgabelayer: softmax layer.
 
 
+def train_by_fit(train_model, dataset):
+    checkpoint_path = "training_1/cp.ckpt"
+    checkpoint_path = os.path.join(cur_dir, checkpoint_path)
+
+    # sys.arg[1] tells python to print training reports every 10 batches
+    call_for_metrics = ExtCallback(int(sys.argv[1]))
+    cp_callback = tf.keras.callbacks.ModelCheckpoint(
+        filepath=checkpoint_path, save_weights_only=False, verbose=1
+    )
+    history = train_model.model.fit(
+        dataset,
+        epochs=5,
+        callbacks=[cp_callback],
+        batch_size=200,
+        # verbose=0,
+        # validation_data=(input_list, output_tar),
+    )
+    return history
+
+
 def run_nn(sor_file, tar_file, window=2):
     batch = Batch()
     # BUG: REQ das Label muss während das lernen immer bekannt sein. S9 Architektur in letzte VL
@@ -52,12 +74,7 @@ def run_nn(sor_file, tar_file, window=2):
     train_model.build_model(window)
     train_model.show_summary()
     train_model.compile_model()
-    # # running model on the fly
-    # for s, t in zip(source, target):
-    #     batch, unfinished = get_next_batch(batch, s, t, window)
 
-    #     # TODO NEXT: try use dataset to combine src tar (and labels - result)
-    #     # data.Dataset
     #     # creates tensors from lists
     feed_src = np.array(batch.source)
     feed_tar = np.array(batch.target)
@@ -83,16 +100,7 @@ def run_nn(sor_file, tar_file, window=2):
     dataset = tf.data.Dataset.zip((dataset, data_set)).batch(200, drop_remainder=True)
 
     # run nn training with fit
-    # FIXME by using fit we assume our entire dataset is fitted which is incorrect: maybe use fit_generator or train_on_batch
-    callme = ExtCallback(100)
-    history = train_model.model.fit(
-        dataset,
-        epochs=5,
-        # callbacks=[callme],
-        batch_size=200,
-        # verbose=0,
-        # validation_data=(input_list, output_tar),
-    )
+    history = train_by_fit(train_model, dataset)
 
     # print the returned metrics from our method
     print(history.history)
@@ -107,6 +115,8 @@ def integrate_gpu():
 
 
 def main():
+    # TODO NEXT: function for hyperparameters?
+
     # check local devices
     integrate_gpu()
 

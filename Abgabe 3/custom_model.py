@@ -33,6 +33,7 @@ class Perplexity(tf.keras.metrics.Metric):
         """
         Method returns perplexity
         """
+        return self.cross_entropy(y_true, y_pred)
         perplexity = tf.keras.backend.exp(self.cross_entropy(y_true, y_pred))
         return perplexity
 
@@ -45,6 +46,7 @@ class Perplexity(tf.keras.metrics.Metric):
             )
 
         # Remember self.perplexity is a tensor (tf.Variable),
+        # FIXME: there is an issue with updating perplexity using this class :(
         self.perplexity = self._calculate_perplexity(y_true, y_pred)
 
     def result(self):
@@ -55,16 +57,20 @@ class Perplexity(tf.keras.metrics.Metric):
         self.perplexity = tf.Variable(0)
 
 
+# using this callback the perplexity gets updated properly
 class ExtCallback(tf.keras.callbacks.Callback):
     def __init__(self, display):
         self.seen = 0
         self.display = display
 
+    # call back seems to update perplexity at a better rate
     def on_batch_end(self, batch, logs):
         self.seen += 1
         if self.seen % self.display == 0:
             outlog = logs
-            outlog["propperplexity"] = int(tf.exp(logs["loss"]).numpy())
+            outlog["perplexity"] = float(tf.exp(logs["loss"]).numpy())
+            for key in outlog:
+                outlog[key] = "{:.2f}".format(outlog[key])
             print("After", self.seen, "batches:", outlog)
 
 
