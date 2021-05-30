@@ -57,7 +57,7 @@ class Perplexity(tf.keras.metrics.Metric):
     def result(self):
         return self.perplexity
 
-    def reset_states(self):
+    def reset_state(self):
         # The state of the metric will be reset at the start of each epoch.
         self.perplexity = tf.Variable(0)
 

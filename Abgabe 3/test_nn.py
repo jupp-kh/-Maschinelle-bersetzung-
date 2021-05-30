@@ -78,7 +78,6 @@ def validate_by_evaluate(train_model, val_data, cp_freq=1000, tb_vis=False):
     # run fit()
     history = train_model.model.evaluate(
         val_data,
-        epochs=5,
         callbacks=callback_list,
         batch_size=200,
         verbose=0,
@@ -150,7 +149,7 @@ def train_by_fit(
     # run fit()
     history = train_model.model.fit(
         dataset_train,
-        epochs=5,
+        epochs=1,
         callbacks=callback_list,
         batch_size=200,
         verbose=0,
@@ -213,7 +212,7 @@ def run_nn(sor_file, tar_file, val_src, val_tar, window=2):
     dataset_val = dataset.skip(batch_count_train)  # validation data
 
     # run nn training with fit
-    history = train_by_fit(train_model, dataset_train, dataset_val)
+    history = train_by_fit(train_model, dataset_train, dataset_val, tb_vis=True)
 
     # print the returned metrics from our method
     # end of training
