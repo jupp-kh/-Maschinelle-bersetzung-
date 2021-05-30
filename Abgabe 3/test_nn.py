@@ -45,6 +45,27 @@ def train_by_fit(train_model, dataset):
     cp_callback = tf.keras.callbacks.ModelCheckpoint(
         filepath=checkpoint_path, save_weights_only=False, verbose=1
     )
+
+    # callback for reducing the learningrate if metrics stagnate on validation data
+    learning_rate_reduction = callbacks.ReduceLROnPlateau(
+        # monitor defines which metric we are monitoring
+        monitor='val_acc',
+        # how many evaluations of no improvement do we wait until we change the LR (learning rate)
+        patience=3,
+        verbose=1,
+        # factor to cut the LR in half
+        factor=0.5,
+        # how often should the LR be reduced? -> give minimal LR here:
+        min_lr=0.00001
+    )
+    # calllback 
+    early_stopping = callbacks.EarlyStopping(
+        # monitor defines which metric we are monitoring
+        monitor = 'acc',
+        # how many evaluations of no improvement do we wait until we change the LR (learning rate)
+        patience = 3
+    )
+
     history = train_model.model.fit(
         dataset,
         epochs=5,
