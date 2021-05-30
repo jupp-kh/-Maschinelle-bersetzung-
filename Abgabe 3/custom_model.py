@@ -117,6 +117,20 @@ class ExtModel(tf.keras.Model):
                 return_metrics[metric.name] = result
         return return_metrics
 
+    def test_step(self, data):
+        # Unpack the data
+        x, y = data
+        y = tf.one_hot(y, depth=len(dic_tar))
+        # Compute predictions
+        y_pred = self(x, training=False)
+        # Updates the metrics tracking the loss
+        self.compiled_loss(y, y_pred, regularization_losses=self.losses)
+        # Update the metrics.
+        self.compiled_metrics.update_state(y, y_pred)
+        # Return a dict mapping metric names to current value.
+        # Note that it will include the loss (tracked in self.metrics).
+        return {m.name: m.result() for m in self.metrics}
+
 
 class FeedForward:
     """
