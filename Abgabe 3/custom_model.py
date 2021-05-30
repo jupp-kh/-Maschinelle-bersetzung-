@@ -8,9 +8,8 @@ Contains metric class Perplexity
 import tensorflow as tf
 import numpy as np
 from tensorflow.python.keras.engine import data_adapter
-from tensorflow.python.keras.layers.core import Dense
 import batches
-from tensorflow.keras.layers import Input, Concatenate, Embedding
+from tensorflow.keras.layers import Input, Concatenate, Embedding, Dense
 from tensorflow.keras.models import Model
 from dictionary import dic_tar, dic_src
 
@@ -29,11 +28,17 @@ class Perplexity(tf.keras.metrics.Metric):
         self.cross_entropy = tf.keras.losses.CategoricalCrossentropy(from_logits=False)
         self.perplexity = self.add_weight(name="tp", initializer="zeros")
 
+    # used for loading models
+    def get_config(self):
+        """Returns the serializable config of the metric."""
+        # config = {"cross_entropy": self.cross_entropy, "perplexity": self.perplexity}
+        base_config = super(Perplexity, self).get_config()
+        return base_config
+
     def _calculate_perplexity(self, y_true, y_pred):
         """
         Method returns perplexity
         """
-        return self.cross_entropy(y_true, y_pred)
         perplexity = tf.keras.backend.exp(self.cross_entropy(y_true, y_pred))
         return perplexity
 

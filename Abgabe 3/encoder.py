@@ -176,8 +176,7 @@ def subword_split(text_file, sequence_file):
         "output",
         ntpath.splitext(ntpath.basename(text_file))[0]
         + "_subword"
-        + ntpath.splitext(ntpath.basename(text_file))[1]
-        + ".txt",
+        + ntpath.splitext(ntpath.basename(text_file))[1],
     )
 
     utility.save_as_txt(file_des, text)
@@ -203,13 +202,13 @@ def run_bpe(*oper):
         # )
 
         subword_split(
-            os.path.join(utility.cur_dir, "data_exercise_3/multi30k.de"),
+            os.path.join(utility.cur_dir, "data_exercise_3/multi30k.dev.de"),
             os.path.join(
                 utility.cur_dir, "output", "multi30k_op_sequence_" + str(n) + ".de.csv"
             ),
         )
         subword_split(
-            os.path.join(utility.cur_dir, "data_exercise_3", "multi30k.en"),
+            os.path.join(utility.cur_dir, "data_exercise_3", "multi30k.dev.en"),
             os.path.join(
                 utility.cur_dir, "output", "multi30k_op_sequence_" + str(n) + ".en.csv"
             ),
@@ -217,5 +216,4 @@ def run_bpe(*oper):
     # revert_bpe("Abgabe 2/data_exercise_2/multi30k.de100")
 
 
-if __name__ == "__main__":
-    run_bpe()
+run_bpe(7000)
