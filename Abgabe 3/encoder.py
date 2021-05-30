@@ -3,12 +3,14 @@ import sys, time, threading
 import utility
 import os
 import ntpath
+
 # Globals
 # testing dictionary
 # the data structure needs some work
 # deutsch_dict = dictionary.Dictionary()
 
 # based on table in page 23 in "Folien zum Vokabular und Subwords Units"
+
 
 class Table:
     """ Table saves the learned words """
@@ -74,9 +76,9 @@ def count_kn_word(word_tab):
         if len(key.split()) == 1:
             kn_counter += 1
         sw_counter += len(key.split())
-            # TODO: maybe remove this, as it is just an assumption for
-            #       that our dictionary would store the tokens/subwords.
-            # save learned subwords in german dictionary
+        # TODO: maybe remove this, as it is just an assumption for
+        #       that our dictionary would store the tokens/subwords.
+        # save learned subwords in german dictionary
         #     deutsch_dict.update(key[0:-4])
         # else:
         #     for sub in key[0:-4].split():
@@ -104,7 +106,6 @@ def get_op_sequences(file, n):
     # list of lines in file
     lis_lines = utility.read_from_file(file)
     word_tab = get_words(lis_lines)  # table of words in file
-    
 
     for _ in range(n):
         tmp_table = Table()  # temp structure
@@ -130,32 +131,55 @@ def get_op_sequences(file, n):
         word_tab = merge_sqnce(word_tab, max_pair)
 
     # word_tab.toString()
-    return  op_squences
+    return op_squences
 
-def creat_op_sequences(file,n):
+
+def create_op_sequences(file, n):
     op_sequences = get_op_sequences(file, n)
-    file_des = os.path.join(utility.cur_dir, 'output',ntpath.splitext(ntpath.basename(file))[0] + '_op_sequence_' + str(n) + '.csv')
+    file_des = os.path.join(
+        utility.cur_dir,
+        "output",
+        ntpath.splitext(ntpath.basename(file))[0]
+        + "_op_sequence_"
+        + str(n)
+        + ntpath.splitext(ntpath.basename(file))[1]
+        + ".csv",
+    )
     utility.save_as_csv(file_des, op_sequences)
+
+
 #
 
-def subword_split(text_file, sequences_file):
-    """ """
-    lines_list= utility.read_from_file(text_file)
+
+def subword_split(text_file, sequence_file):
+    """
+    runs subword split on text_file
+    """
+    lines_list = utility.read_from_file(text_file)
     text = ""
+
+    #
     for line in lines_list:
         for word in line.split():
-            text += " ".join(list(word))+"</w> "
+            text += " ".join(list(word)) + "</w> "
         text += "\n"
-    
-    op_sequences = utility.read_from_file(sequences_file) 
-   
+
+    # read operation sequence from file
+    op_sequences = utility.read_from_file(sequence_file)
+
     for sequence in op_sequences:
         text = text.replace(sequence, sequence.replace(" ", ""))
 
     text = text.replace(" ", "@@ ").replace("</w>@@", "")
-    file_des = os.path.join(utility.cur_dir, 'output',ntpath.splitext(ntpath.basename(text_file))[0] + '_subword' + '.txt')
-    
-    utility.save_as_txt(file_des,text)
+    file_des = os.path.join(
+        utility.cur_dir,
+        "output",
+        ntpath.splitext(ntpath.basename(text_file))[0]
+        + "_subword"
+        + ntpath.splitext(ntpath.basename(text_file))[1],
+    )
+
+    utility.save_as_txt(file_des, text)
 
 
 def revert_bpe(file):
@@ -168,15 +192,28 @@ def revert_bpe(file):
         write_f.write(reader.replace("@@ ", ""))
 
 
-def main():
-    op_number = [100]
-    for n in op_number:  # replace list with op_number
-        #subword_split(os.path.join(utility.cur_dir ,"data_exercise_2/multi30k.de"), n)
-        #creat_op_sequences(os.path.join(utility.cur_dir ,"data_exercise_2/multi30k.de"), n)
-        subword_split(os.path.join(utility.cur_dir ,"data_exercise_2/multi30k.de"),
-        os.path.join(utility.cur_dir ,"output/multi30k_op_sequence_100.csv"))
+def run_bpe(*oper):
+    for n in oper:  # replace list with op_number
+        # create_op_sequences(
+        #    os.path.join(utility.cur_dir, "data_exercise_3/multi30k.de"), n
+        # )
+        # create_op_sequences(
+        #    os.path.join(utility.cur_dir, "data_exercise_3/multi30k.en"), n
+        # )
+
+        subword_split(
+            os.path.join(utility.cur_dir, "data_exercise_3/multi30k.dev.de"),
+            os.path.join(
+                utility.cur_dir, "output", "multi30k_op_sequence_" + str(n) + ".de.csv"
+            ),
+        )
+        subword_split(
+            os.path.join(utility.cur_dir, "data_exercise_3", "multi30k.dev.en"),
+            os.path.join(
+                utility.cur_dir, "output", "multi30k_op_sequence_" + str(n) + ".en.csv"
+            ),
+        )
     # revert_bpe("Abgabe 2/data_exercise_2/multi30k.de100")
 
 
-if __name__ == "__main__":
-    main()
+run_bpe(7000)

@@ -1,14 +1,13 @@
 import csv
-import os, sys
+import os
 import utility as ut
 from utility import cur_dir
-import dictionary
 import math
+from dictionary import dic_tar
+from dictionary import dic_src
 
 ############## Globals ###############
 # used to store directory of script file
-dic_tar = dictionary.Dictionary()
-dic_src = dictionary.Dictionary()
 output_filename = "output/batch"
 save_batch = None
 
@@ -26,17 +25,19 @@ class Batch:
 
     @property
     def source(self):
-        """gets source windows"""
+        """gets source windows
+        size 2 * w + 1"""
         return self._source
 
     @property
     def label(self):
-        """gets target labels"""
+        """gets target labels """
         return self._label
 
     @property
     def target(self):
-        """gets target windows"""
+        """gets target windows
+        size w"""
         return self._target
 
     @property
@@ -74,6 +75,7 @@ def alignment(sor_len, tar_len):
     op = lambda x: math.floor(x * (sor_len / tar_len))
     return op
 
+
 def save_batch_as_int(batch):
     """writes the batch as ints inside batch.csv"""
     global output_filename
@@ -85,8 +87,9 @@ def save_batch_as_int(batch):
         writer.writerow([])
     batch_csv.close()
 
+
 def save_batch_as_string(batch):
-    """writes the batch as strings inside batch.csv"""   
+    """writes the batch as strings inside batch.csv"""
     global output_filename
     file_des = os.path.join(cur_dir, output_filename)
     with open(file_des, "a+", newline="", encoding="utf-8") as batch_csv:
@@ -97,10 +100,10 @@ def save_batch_as_string(batch):
 
         for (s, t, l) in zip(batch.source, batch.target, batch.label):
             writer.writerow(
-            [
-                " ".join([src_keys[i] for i in s]),
-                " ".join([tar_keys[i] for i in t]), 
-                tar_keys[l]
+                [
+                    " ".join([src_keys[i] for i in s]),
+                    " ".join([tar_keys[i] for i in t]),
+                    tar_keys[l],
                 ]
             )
         writer.writerow([])
@@ -108,10 +111,12 @@ def save_batch_as_string(batch):
 
 
 # target and source passed as lines
-def create_batch(batch, source, target, w):
-    """called by create_batches,
+def create_batch(batch, source, target, w=2):
+    """
+    called by create_batches,
     creates the batch and stores data in batch.csv,
-    returns batch"""
+    returns batch
+    """
     global save_batch
 
     modifi_target = (
@@ -138,8 +143,11 @@ def create_batch(batch, source, target, w):
 
     return batch
 
+
 def get_word_index(src, trg):
-    """uses dictionaries to replace strings with the index"""
+    """
+    uses dictionaries to replace strings with the index
+    """
     target, source = [], []
     dic_src.update("<s>", "</s>")
     dic_tar.update("<s>", "</s>")
@@ -159,16 +167,19 @@ def get_word_index(src, trg):
 
     return source, target
 
+
 # as_string determines if batch is saved with int or strings
 # start and end are the range of lines we create batches for
-def create_batches(sor_file, tar_file, window, as_string=False, start=0, end=-1):
-    """creates the batches by computing source windows, target windows
-    and target label for the specified files"""
+def create_batches(sor_file, tar_file, window=2, as_string=False, start=0, end=-1):
+    """
+    creates the batches by computing source windows, target windows
+    and target label for the specified files
+    """
     global save_batch
     global output_filename
 
     if start != 0 or end != -1:
-        output_filename = "output/batch_"+str(start)+"_"+str(end)
+        output_filename = "output/batch_" + str(start) + "_" + str(end)
     if as_string:
         save_batch = save_batch_as_string
         output_filename += "_string.csv"
@@ -180,46 +191,84 @@ def create_batches(sor_file, tar_file, window, as_string=False, start=0, end=-1)
         os.remove(os.path.join(cur_dir, output_filename))
     except:
         print("No file, creating new file")
- 
+
     # store source and target file as list of words
     src = ut.read_from_file(sor_file, start, end)
     trg = ut.read_from_file(tar_file, start, end)
 
     source, target = get_word_index(src, trg)
- 
- 
+
     batch = Batch()
     for s, t in zip(source, target):
-        batch = create_batch(batch, s, t, 2)
+        batch = create_batch(batch, s, t, window)
         if batch.size >= 200:
             newbatch = Batch()
             for i in range(200, batch.size):
-                newbatch.append_s(batch.source[200]) 
+                newbatch.append_s(batch.source[200])
                 batch.source.remove(batch.source[200])
-                newbatch.append_l(batch.label[200]) 
+                newbatch.append_l(batch.label[200])
                 batch.label.remove(batch.label[200])
-                newbatch.append_t(batch.target[200]) 
+                newbatch.append_t(batch.target[200])
                 batch.target.remove(batch.target[200])
                 newbatch.size += 1
                 batch.size -= 1
-            #TODO bearbeitung des batches
-            batch = newbatch 
-                
-            
+            # TODO bearbeitung des batches
+            batch = newbatch
+
     # save last batch
     if batch.size != 0:
         save_batch(batch)
 
-def main():
 
+def get_next_batch(batch, s, t, w=2):
+    """
+    Creates the next batch
+    Called on the fly, see test_nn.main()
+    """
+    batch = create_batch(batch, s, t, w)
+
+    # make sure batch size exceeds 200 lines
+    # while batch.size < 200:
+    #     batch = create_batch(batch, s, t, w)
+
+    # remove unnecessary lines from batch to maintain 200 lines per batch
+    if batch.size >= 200:
+        newbatch = Batch()
+        for i in range(200, batch.size):
+            newbatch.append_s(batch.source[200])
+            batch.source.remove(batch.source[200])
+            newbatch.append_l(batch.label[200])
+            batch.label.remove(batch.label[200])
+            newbatch.append_t(batch.target[200])
+            batch.target.remove(batch.target[200])
+            newbatch.size += 1
+            batch.size -= 1
+
+        # Hold on to the excesive lines for next batch
+        return batch, newbatch
+
+    # returns None when batch contains exactly 200 lines
+    return batch, None
+
+
+def get_all_batches(source, target, w):
+    batch = Batch()
+    for s, t in zip(source, target):
+        batch = create_batch(batch, s, t, w)
+    return batch
+
+
+def main():
+    # call method
     create_batches(
-        os.path.join(cur_dir, "data_exercise_2","multi30k.en"),
-        os.path.join(cur_dir, "data_exercise_2","multi30k.de"),
+        os.path.join(cur_dir, "data_exercise_2", "multi30k.en"),
+        os.path.join(cur_dir, "data_exercise_2", "multi30k.de"),
         2,
         as_string=False,
-        start = 100,
-        end = 500
+        start=100,
+        end=500,
     )
+
 
 if __name__ == "__main__":
     main()
