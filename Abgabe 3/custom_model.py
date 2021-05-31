@@ -149,11 +149,11 @@ class FeedForward:
 
         input_point_1 = Input(shape=(2 * w + 1,), name="I0")
 
-        x = Embedding(len(dic_src), 200)(input_point_1)
+        x = Embedding(len(dic_src), 250)(input_point_1)
         x = Dense(units=200, activation="relu", name="FullyConSource")(x)
 
         input_point_2 = Input(shape=(w,), name="I1")
-        y = Embedding(len(dic_tar), 200, name="EmbeddedTarget")(input_point_2)
+        y = Embedding(len(dic_tar), 250, name="EmbeddedTarget")(input_point_2)
         y = Dense(units=200, activation="relu", name="FullyConTarget")(y)
 
         fully_concat = Concatenate(axis=1, name="ConcatLayer")([x, y])

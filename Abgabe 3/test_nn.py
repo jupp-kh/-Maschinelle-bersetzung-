@@ -39,13 +39,13 @@ def validate_by_evaluate(train_model, val_data, cp_freq=1000, tb_vis=False):
     tb_log = os.path.join(cur_dir, tb_log)
     checkpoint_path = os.path.join(cur_dir, checkpoint_path)
 
-    # sys.arg[1] tells python to print training reports every 10 batches
+    # sys.arg[1] tells python to print training reports every n batches
     # specify callbacks to store metrics and logs
-    call_for_metrics = ExtCallback(int(sys.argv[1]))
+    call_for_metrics = ExtCallback((sys.argv[1]))
 
     cp_callback = tf.keras.callbacks.ModelCheckpoint(
         filepath=checkpoint_path,
-        save_weights_only=False,
+        save_weights_only=True,
         verbose=1,
         save_freq=cp_freq,
     )
@@ -89,7 +89,7 @@ def train_by_fit(
     train_model, dataset_train, dataset_val, cp_freq=1000, lr_frac=False, tb_vis=False
 ):
     # specify path to save checkpoint data and tensorboard
-    checkpoint_path = "training_1/cp.hdf5"
+    checkpoint_path = "training_1/train_model.epoch{epoch:02d}-loss{loss:.2f}.hdf5"
     tb_log = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     tb_log = os.path.join(cur_dir, tb_log)
     checkpoint_path = os.path.join(cur_dir, checkpoint_path)
@@ -139,7 +139,7 @@ def train_by_fit(
     if lr_frac:
         callback_list.append(learning_rate_reduction)
 
-    if tb_vis:
+    if not tb_vis:
         try:
             os.system("rm -rf ./logs/")
         except:
@@ -149,7 +149,7 @@ def train_by_fit(
     # run fit()
     history = train_model.model.fit(
         dataset_train,
-        epochs=1,
+        epochs=11,
         callbacks=callback_list,
         batch_size=200,
         verbose=0,
@@ -236,7 +236,8 @@ def run_nn(sor_file, tar_file, val_src, val_tar, window=2):
     )
 
     # evaluate results
-    validate_by_evaluate(train_model, val_dataset)
+    val_history = validate_by_evaluate(train_model, val_dataset)
+    print(val_history)
 
 
 def integrate_gpu():
@@ -260,10 +261,10 @@ def main():
 
     ## Run neural network
     run_nn(
-        os.path.join(cur_dir, "output", "multi30k_subword.en"),
-        os.path.join(cur_dir, "output", "multi30k_subword.de"),
-        os.path.join(cur_dir, "output", "multi30k.dev_subword.en"),
-        os.path.join(cur_dir, "output", "multi30k.dev_subword.de"),
+        os.path.join(cur_dir, "output", sys.argv[3]),
+        os.path.join(cur_dir, "output", sys.argv[4]),
+        os.path.join(cur_dir, "output", sys.argv[5]),
+        os.path.join(cur_dir, "output", sys.argv[6]),
     )
 
 
