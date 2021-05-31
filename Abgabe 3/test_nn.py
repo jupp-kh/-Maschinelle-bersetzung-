@@ -13,7 +13,7 @@ import math
 import datetime
 
 # globals sit here.
-from custom_model import FeedForward, ExtCallback, Perplexity
+from custom_model import MetricsCallback, Perplexity, WordLabelerModel
 from dictionary import dic_src, dic_tar
 from utility import cur_dir
 from tensorflow.python.keras.backend import _LOCAL_DEVICES
@@ -41,7 +41,7 @@ def validate_by_evaluate(train_model, val_data, cp_freq=1000, tb_vis=False):
 
     # sys.arg[1] tells python to print training reports every n batches
     # specify callbacks to store metrics and logs
-    call_for_metrics = ExtCallback((sys.argv[1]))
+    call_for_metrics = MetricsCallback((sys.argv[1]))
 
     cp_callback = tf.keras.callbacks.ModelCheckpoint(
         filepath=checkpoint_path,
@@ -76,7 +76,7 @@ def validate_by_evaluate(train_model, val_data, cp_freq=1000, tb_vis=False):
         callback_list.append(tb_callback)
 
     # run fit()
-    history = train_model.model.evaluate(
+    history = train_model.evaluate(
         val_data,
         callbacks=callback_list,
         batch_size=200,
@@ -96,7 +96,7 @@ def train_by_fit(
 
     # sys.arg[1] tells python to print training reports every 10 batches
     # specify callbacks to store metrics and logs
-    call_for_metrics = ExtCallback(int(sys.argv[1]))
+    call_for_metrics = MetricsCallback(int(sys.argv[1]))
 
     cp_callback = tf.keras.callbacks.ModelCheckpoint(
         monitor="perplexity",
@@ -147,7 +147,7 @@ def train_by_fit(
         callback_list.append(tb_callback)
 
     # run fit()
-    history = train_model.model.fit(
+    history = train_model.fit(
         dataset_train,
         epochs=11,
         callbacks=callback_list,
@@ -178,12 +178,11 @@ def run_nn(sor_file, tar_file, val_src, val_tar, window=2):
 
     # Modell is a sub class from keras.Model()
     # Modell() in custom_model.py
-    train_model = FeedForward()
-    train_model.build_model(window)
-    train_model.show_summary()
+    train_model = WordLabelerModel()
+    # train_model.build_model(window)
 
     train_model.compile_model()
-    train_model.show_summary()
+    print(train_model.summary())
 
     #  creates tensors from lists
     feed_src = np.array(batch.source)
