@@ -29,7 +29,7 @@ from tensorflow.python.keras.backend import _LOCAL_DEVICES
 # Ausgabelayer: softmax layer.
 
 
-def get_callback_list(cp_freq=1000, tb_vis=False, lr_frac=False):
+def get_callback_list(cp_freq=1000, tb_vis=False, lr_frac=False, isVal=False):
     # specify path to save checkpoint data and tensorboard
     checkpoint_path = "training_1/train_model.epoch{epoch:02d}-loss{loss:.2f}.hdf5"
     tb_log = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -45,7 +45,7 @@ def get_callback_list(cp_freq=1000, tb_vis=False, lr_frac=False):
         filepath=checkpoint_path,
         save_weights_only=False,
         verbose=1,
-        save_freq="epoch",
+        save_freq=int(cp_freq),
     )
 
     # callback for reducing the learningrate if metrics stagnate on validation data
@@ -73,6 +73,10 @@ def get_callback_list(cp_freq=1000, tb_vis=False, lr_frac=False):
     tb_callback = tf.keras.callbacks.TensorBoard(
         log_dir=tb_log,
         histogram_freq=1,
+        write_graph=True,
+        write_images=True,
+        update_freq="epoch",
+        embeddings_freq=1
     )
 
     callback_list = [call_for_metrics, early_stopping, cp_callback]
@@ -81,10 +85,11 @@ def get_callback_list(cp_freq=1000, tb_vis=False, lr_frac=False):
         callback_list.append(learning_rate_reduction)
 
     if tb_vis:
-        try:
-            os.system("rm -rf ./logs/")
-        except:
-            print("No previous logs...")
+        if not isVal:
+            try:
+                os.system("rm -rf ./logs/")
+            except:
+                print("No previous logs...")
         callback_list.append(tb_callback)
 
     # creating callback list for fit()
@@ -94,7 +99,7 @@ def get_callback_list(cp_freq=1000, tb_vis=False, lr_frac=False):
 def validate_by_evaluate(train_model, val_data):
 
     # creating callback list for evaluate()
-    callback_list = get_callback_list(cp_freq=sys.argv[7], tb_vis=sys.argv[9])
+    callback_list = get_callback_list(cp_freq=sys.argv[7], tb_vis=sys.argv[9],isVal=True)
 
     # run fit()
     history = train_model.evaluate(
@@ -109,7 +114,7 @@ def validate_by_evaluate(train_model, val_data):
 def train_by_fit(train_model, dataset_train, dataset_val):
     # creating callback list for fit()
     callback_list = get_callback_list(
-        cp_freq=sys.argv[7], lr_frac=sys.argv[8], tb_vis=sys.argv[9]
+        cp_freq=sys.argv[7], lr_frac=sys.argv[8], tb_vis=sys.argv[9],isVal=False
     )
 
     # run fit()
@@ -231,6 +236,5 @@ def main():
         os.path.join(cur_dir, "output", sys.argv[5]),
         os.path.join(cur_dir, "output", sys.argv[6]),
     )
-
 
 main()
