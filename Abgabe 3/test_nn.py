@@ -1,35 +1,38 @@
-from encoder import run_bpe
-import tensorflow as tf
-import numpy as np
-import utility as ut
+"""
+    ######################## Adapted Architecture ########################
+    # input layer: src window - target window
+    # feste Größe N=200
+    # zur Darstellung des Vokabulars wird one hot vector benötigt
+    # Fully connected source  - fully connected target
+    # concat layer
+    # fully connected layer 1
+    # fully connected layer 2 / Projektion
+    # Ausgabelayer: softmax layer.
+"""
+import math
 import os
+import sys
+import datetime
+import numpy as np
+import tensorflow as tf
+from tensorflow.python.keras.backend import _LOCAL_DEVICES
 import batches
 from batches import Batch, get_all_batches
-import sys
-import math
-import datetime
+import utility as ut
+from encoder import run_bpe
 
 # globals sit here.
 from custom_model import MetricsCallback, WordLabelerModel
-from dictionary import dic_src, dic_tar
 from utility import cur_dir
-from tensorflow.python.keras.backend import _LOCAL_DEVICES
 
 # NOTE: using loop to do the feed forward is slow because loops in py are inefficient.
 #   -> use %timeit !?
 
-######################## Adapted Architecture ########################
-# input layer: src window - target window
-# feste Größe N=200
-# zur Darstellung des Vokabulars wird one hot vector benötigt
-# Fully connected source  - fully connected target
-# concat layer
-# fully connected layer 1
-# fully connected layer 2 / Projektion
-# Ausgabelayer: softmax layer.
 
-
-def get_callback_list(cp_freq=1000, tb_vis=False, lr_frac=False, isVal=False):
+def get_callback_list(cp_freq=1000, tb_vis=False, lr_frac=False, is_val=False):
+    """
+    Returns list of callback for validation and training
+    """
     # specify path to save checkpoint data and tensorboard
     checkpoint_path = "training_1/train_model.epoch{epoch:02d}-loss{loss:.2f}.hdf5"
     tb_log = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -75,8 +78,8 @@ def get_callback_list(cp_freq=1000, tb_vis=False, lr_frac=False, isVal=False):
         histogram_freq=1,
         write_graph=True,
         write_images=True,
-        update_freq="epoch",
-        embeddings_freq=1
+        update_freq=50,
+        embeddings_freq=1,
     )
 
     callback_list = [call_for_metrics, early_stopping, cp_callback]
@@ -85,7 +88,7 @@ def get_callback_list(cp_freq=1000, tb_vis=False, lr_frac=False, isVal=False):
         callback_list.append(learning_rate_reduction)
 
     if tb_vis:
-        if not isVal:
+        if not is_val:
             try:
                 os.system("rm -rf ./logs/")
             except:
@@ -97,9 +100,13 @@ def get_callback_list(cp_freq=1000, tb_vis=False, lr_frac=False, isVal=False):
 
 
 def validate_by_evaluate(train_model, val_data):
-
+    """
+    Runs evaluate on train_model
+    """
     # creating callback list for evaluate()
-    callback_list = get_callback_list(cp_freq=sys.argv[7], tb_vis=sys.argv[9],isVal=True)
+    callback_list = get_callback_list(
+        cp_freq=sys.argv[7], tb_vis=sys.argv[9], is_val=True
+    )
 
     # run fit()
     history = train_model.evaluate(
@@ -112,9 +119,12 @@ def validate_by_evaluate(train_model, val_data):
 
 
 def train_by_fit(train_model, dataset_train, dataset_val):
+    """
+    Runs fit() on train_model
+    """
     # creating callback list for fit()
     callback_list = get_callback_list(
-        cp_freq=sys.argv[7], lr_frac=sys.argv[8], tb_vis=sys.argv[9],isVal=False
+        cp_freq=sys.argv[7], lr_frac=sys.argv[8], tb_vis=sys.argv[9], is_val=False
     )
 
     # run fit()
@@ -130,6 +140,9 @@ def train_by_fit(train_model, dataset_train, dataset_val):
 
 
 def run_nn(sor_file, tar_file, val_src, val_tar, window=2):
+    """
+    Trains and validates training data.
+    """
     batch = Batch()
     # BUG: REQ das Label muss während das lernen immer bekannt sein. S9 Architektur in letzte VL
 
@@ -219,6 +232,9 @@ def integrate_gpu():
 
 
 def main():
+    """
+    main function
+    """
     # TODO NEXT: function for hyperparameters?
 
     # check local devices
@@ -236,5 +252,6 @@ def main():
         os.path.join(cur_dir, "output", sys.argv[5]),
         os.path.join(cur_dir, "output", sys.argv[6]),
     )
+
 
 main()
