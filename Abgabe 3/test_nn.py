@@ -1,9 +1,6 @@
-from tensorflow.python.training.saving import checkpoint_options
 from encoder import run_bpe
 import tensorflow as tf
 import numpy as np
-from tensorflow._api.v2 import data
-from tensorflow.python.ops.gen_dataset_ops import dataset_to_graph_v2
 import utility as ut
 import os
 import batches
@@ -13,7 +10,7 @@ import math
 import datetime
 
 # globals sit here.
-from custom_model import MetricsCallback, Perplexity, WordLabelerModel
+from custom_model import MetricsCallback, WordLabelerModel
 from dictionary import dic_src, dic_tar
 from utility import cur_dir
 from tensorflow.python.keras.backend import _LOCAL_DEVICES
@@ -32,69 +29,14 @@ from tensorflow.python.keras.backend import _LOCAL_DEVICES
 # Ausgabelayer: softmax layer.
 
 
-def validate_by_evaluate(train_model, val_data, cp_freq=1000, tb_vis=False):
-    # specify path to save checkpoint data and tensorboard
-    checkpoint_path = "training_1/cp_val.hdf5"
-    tb_log = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    tb_log = os.path.join(cur_dir, tb_log)
-    checkpoint_path = os.path.join(cur_dir, checkpoint_path)
-
-    # sys.arg[1] tells python to print training reports every n batches
-    # specify callbacks to store metrics and logs
-    call_for_metrics = MetricsCallback((sys.argv[1]))
-
-    cp_callback = tf.keras.callbacks.ModelCheckpoint(
-        filepath=checkpoint_path,
-        save_weights_only=True,
-        verbose=1,
-        save_freq=cp_freq,
-    )
-
-    # callback
-    early_stopping = tf.keras.callbacks.EarlyStopping(
-        # monitor defines which metric we are monitoring
-        monitor="accuracy",
-        # how many evaluations of no improvement do we wait until we change the LR (learning rate)
-        patience=3,
-        restore_best_weights=True,
-    )
-
-    # tensorboard callback
-    tb_callback = tf.keras.callbacks.TensorBoard(
-        log_dir=tb_log,
-        histogram_freq=1,
-    )
-
-    # creating callback list for fit()
-    callback_list = [call_for_metrics, early_stopping, cp_callback]
-
-    if tb_vis:
-        try:
-            os.system("rm -rf ./logs/")
-        except:
-            print("No previous logs...")
-        callback_list.append(tb_callback)
-
-    # run fit()
-    history = train_model.evaluate(
-        val_data,
-        callbacks=callback_list,
-        batch_size=200,
-        verbose=0,
-    )
-    return history
-
-
-def train_by_fit(
-    train_model, dataset_train, dataset_val, cp_freq=1000, lr_frac=False, tb_vis=False
-):
+def get_callback_list(cp_freq=1000, tb_vis=False, lr_frac=False):
     # specify path to save checkpoint data and tensorboard
     checkpoint_path = "training_1/train_model.epoch{epoch:02d}-loss{loss:.2f}.hdf5"
     tb_log = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     tb_log = os.path.join(cur_dir, tb_log)
     checkpoint_path = os.path.join(cur_dir, checkpoint_path)
 
-    # sys.arg[1] tells python to print training reports every 10 batches
+    # sys.arg[1] tells python to print training reports every n batches
     # specify callbacks to store metrics and logs
     call_for_metrics = MetricsCallback(int(sys.argv[1]))
 
@@ -103,7 +45,7 @@ def train_by_fit(
         filepath=checkpoint_path,
         save_weights_only=False,
         verbose=1,
-        save_freq=cp_freq,
+        save_freq="epoch",
     )
 
     # callback for reducing the learningrate if metrics stagnate on validation data
@@ -133,18 +75,42 @@ def train_by_fit(
         histogram_freq=1,
     )
 
-    # creating callback list for fit()
     callback_list = [call_for_metrics, early_stopping, cp_callback]
 
     if lr_frac:
         callback_list.append(learning_rate_reduction)
 
-    if not tb_vis:
+    if tb_vis:
         try:
             os.system("rm -rf ./logs/")
         except:
             print("No previous logs...")
         callback_list.append(tb_callback)
+
+    # creating callback list for fit()
+    return callback_list
+
+
+def validate_by_evaluate(train_model, val_data):
+
+    # creating callback list for evaluate()
+    callback_list = get_callback_list(cp_freq=sys.argv[7], tb_vis=sys.argv[9])
+
+    # run fit()
+    history = train_model.evaluate(
+        val_data,
+        callbacks=callback_list,
+        batch_size=200,
+        verbose=0,
+    )
+    return history
+
+
+def train_by_fit(train_model, dataset_train, dataset_val):
+    # creating callback list for fit()
+    callback_list = get_callback_list(
+        cp_freq=sys.argv[7], lr_frac=sys.argv[8], tb_vis=sys.argv[9]
+    )
 
     # run fit()
     history = train_model.fit(
@@ -211,7 +177,7 @@ def run_nn(sor_file, tar_file, val_src, val_tar, window=2):
     dataset_val = dataset.skip(batch_count_train)  # validation data
 
     # run nn training with fit
-    history = train_by_fit(train_model, dataset_train, dataset_val, tb_vis=True)
+    history = train_by_fit(train_model, dataset_train, dataset_val)
 
     # print the returned metrics from our method
     # end of training
@@ -256,7 +222,7 @@ def main():
     # running BPE with 7k operations on dev text
     # DONE: this part has been previously done! uncomment
     #       next line to create files for subsword split.
-    # run_bpe(7000)
+    # run_bpe(sys.args[2]) # system argument holds number of operations in bpe
 
     ## Run neural network
     run_nn(
