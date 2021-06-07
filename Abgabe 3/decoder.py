@@ -3,11 +3,31 @@
 """
 
 from tensorflow.keras import Model
+from tensorflow.python.keras.backend import argmax
 from batches import *
 from custom_model import Perplexity, WordLabelerModel
 import tensorflow as tf
 import numpy as np
 import utility as ut
+
+
+def greedy_decoder(arr):
+    """ Implements the greedy decoder search algorithm """
+    tmp = []
+    result = []
+    for elem in arr:
+        biggest = tf.keras.backend.get_value(argmax(elem))
+        if biggest == 1 and tmp != []:
+            tmp.append(biggest)
+            result.append(tmp)
+            tmp = []
+            continue
+        tmp.append(biggest)
+    return result
+
+
+def beam_decoder(arr, k):
+    pass
 
 
 def tester(sor_file, tar_file, val_src, val_tar, window=2):
@@ -48,12 +68,21 @@ def tester(sor_file, tar_file, val_src, val_tar, window=2):
     feed_src = np.array(batch.source)
     feed_src = {"I0": feed_src, "I1": np.array(batch.target)}
     feed_src = tf.data.Dataset.from_tensor_slices(feed_src).batch(
-        200, drop_remainder=True
+        1, drop_remainder=True
     )
 
     # prediction step
-    history = test_model.predict(feed_src, batch_size=200, callbacks=None)
-    print(history)
+    history = test_model.predict(feed_src, batch_size=1, callbacks=None)
+    new_text = greedy_decoder(history)
+    keys_list = dic_tar.get_keys()
+    for line in range(len(new_text)):
+        for word in range(len(new_text[line])):
+            new_text[line][word] = keys_list[new_text[line][word]]
+
+    ut.save_list_as_txt(
+        os.path.join(cur_dir, "output", "greedy_prediction.de"),
+        new_text,
+    )
 
 
 def main():
@@ -65,4 +94,5 @@ def main():
     )
 
 
-main()
+if __name__ == "__main__":
+    main()

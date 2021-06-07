@@ -20,6 +20,7 @@ import batches
 from batches import Batch, get_all_batches
 import utility as ut
 from encoder import run_bpe
+from dictionary import dic_src, dic_tar
 
 # globals sit here.
 from custom_model import MetricsCallback, WordLabelerModel

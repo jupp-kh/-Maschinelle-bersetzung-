@@ -78,3 +78,15 @@ def save_as_txt(file_des, data):
 
     with open(file_des, "x", encoding="utf-8") as write_f:
         write_f.write(data)
+
+
+def save_list_as_txt(file_des, data_list):
+    try:
+        os.remove(file_des)
+    except:
+        print("No file, creating new file")
+    with open(file_des, "w", encoding="utf-8") as write_f:
+        for line in data_list:
+            for word in line:
+                write_f.write(str(word) + " ")
+            write_f.write("\n")
