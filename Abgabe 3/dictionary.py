@@ -56,6 +56,18 @@ class Dictionary:
         for word in dic_list:
             self.update(word.split()[0])
 
+    def translate_to_nums(self, words):
+        """
+        uses bi_dict to replace strings with their index
+        """
+        pass
+
+    def translate_to_words(self, numbers):
+        """
+        uses bi_dict to replace numbers with their key
+        """
+        pass
+
 
 ###  Globals
 dic_tar = Dictionary()

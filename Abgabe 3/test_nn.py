@@ -109,7 +109,7 @@ def validate_by_evaluate(train_model, val_data):
         cp_freq=sys.argv[7], tb_vis=sys.argv[9], is_val=True
     )
 
-    # run fit()
+    # run evaluate()
     history = train_model.evaluate(
         val_data,
         callbacks=callback_list,

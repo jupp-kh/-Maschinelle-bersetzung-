@@ -58,6 +58,7 @@ def read_from_file(datei, start=0, end=-1):
 
 
 def save_as_csv(file_des, data):
+    """ Saves data str as csv in file_des """
     try:
         os.remove(file_des)
     except:
@@ -71,6 +72,7 @@ def save_as_csv(file_des, data):
 
 
 def save_as_txt(file_des, data):
+    """ Saves data str as txt in file_des """
     try:
         os.remove(file_des)
     except:
@@ -81,6 +83,7 @@ def save_as_txt(file_des, data):
 
 
 def save_list_as_txt(file_des, data_list):
+    """ Saves data_list as csv in file_des """
     try:
         os.remove(file_des)
     except:

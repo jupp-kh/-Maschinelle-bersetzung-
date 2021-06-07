@@ -6,9 +6,6 @@ Contains metric class Perplexity
 * Contains network archictecture for word embedding: Modell
 """
 import tensorflow as tf
-import numpy as np
-from tensorflow.python.keras.engine import data_adapter
-import batches
 from tensorflow.keras.layers import Input, Concatenate, Embedding, Dense
 from tensorflow.keras.models import Model
 from dictionary import dic_tar, dic_src
@@ -80,7 +77,7 @@ class MetricsCallback(tf.keras.callbacks.Callback):
 
 
 # class declaration
-class WordLabelerModel(tf.keras.Model):
+class WordLabelerModel(Model):
     # initialise model and build layers immediatly.
     def __init__(self, window_size=2):
         #     # building model
