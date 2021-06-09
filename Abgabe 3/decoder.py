@@ -32,23 +32,56 @@ def beam_decoder(arr, k):
     Implements the beam search decoding algorithm
     Returns k lists with best possible predictions
     """
-    result = [[] for _ in range(k)]
+
+    line_length = 13    # TODO: no hard
+    # avrg line length
+    # wc -lw data_exercise_3/multi30k.de | awk '{print $2/$1}'
+    lines = []
+
+    while arr:
+        data = arr[:line_length]
+        arr = arr[line_length:]
+        sequences = [[list(),0.0]]
+        for elem in data:
+            all_candidates = list()
+            log_elem = tf.math.log(elem)
+            for i in range(len(sequences)):
+                seq, score = sequences[i]
+                for j in range(len(elem)):
+                    candidate = [seq + [j], score - log_elem[j].numpy()]
+                    all_candidates.append(candidate)
+            # order all candidates by score
+            ordered = sorted(all_candidates, key=lambda tup:tup[1])
+            # select k best
+            sequences = ordered[:k]
+        
+        lines.append([sequences])
+
+
+    # for elem in arr:
+    #     k_candidates = tf.math.top_k(elem, k).indices
+    #     k_candidates = [tf.keras.backend.get_value(e) for e in k_candidates]
+
+    #     # print("k_candidates:", k_candidates)
+    #     for i in range(k):
+    #         sentence[i].append(keys_list[int(k_candidates[i])])
+    #         if keys_list[int(k_candidates[i])] == "." and sentence[i] != []:
+    #             result[i].append(sentence[i])
+    #             # print("result:", result)
+    #             sentence[i] = []
+
+    #
+    return lines
+
+def create_text_files(lines,k):
     sentence = [[] for _ in range(k)]
     keys_list = dic_tar.get_keys()
 
-    for elem in arr:
-        k_candidates = tf.math.top_k(elem, k).indices
-        k_candidates = [tf.keras.backend.get_value(e) for e in k_candidates]
-        # print("k_candidates:", k_candidates)
+    for line in lines:
         for i in range(k):
-            sentence[i].append(keys_list[int(k_candidates[i])])
-            if keys_list[int(k_candidates[i])] == "." and sentence[i] != []:
-                result[i].append(sentence[i])
-                # print("result:", result)
-                sentence[i] = []
-
-    #
-    return result
+            str_lines = map(lambda x: keys_list[x] ,line[i][0])
+            sentence = " ".join(str_lines)
+            ut.save_line_as_txt(os.path.join(cur_dir, "predictions", "beam_prediction" + str(i) + ".de"), sentence)
 
 
 #
@@ -71,7 +104,7 @@ def tester(sor_file, tar_file, val_src, val_tar, window=2):
 
     # test_model = WordLabelerModel()
     test_model = tf.keras.models.load_model(
-        "training_101/train_model.epoch01-loss3.94.hdf5",
+        "training_1/train_model.epoch01-loss4.34.hdf5",
         custom_objects={"WordLabelerModel": WordLabelerModel, "perplexity": Perplexity},
         compile=False,
     )
@@ -96,18 +129,17 @@ def tester(sor_file, tar_file, val_src, val_tar, window=2):
     # prediction step
     history = test_model.predict(feed_src, batch_size=1, callbacks=None)
 
-    greedy_text = greedy_decoder(history)
     beam_text = beam_decoder(history, 3)
+    create_text_files(beam_text,k=3)
 
+    return
+
+    greedy_text = greedy_decoder(history)
+    
     ut.save_list_as_txt(
         os.path.join(cur_dir, "predictions", "greedy_prediction.de"),
         greedy_text,
     )
-    for i in range(3):
-        ut.save_list_as_txt(
-            os.path.join(cur_dir, "predictions", "greedy_prediction" + str(i) + ".de"),
-            beam_text[i],
-        )
 
 
 def main():
