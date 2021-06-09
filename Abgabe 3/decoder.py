@@ -1,7 +1,7 @@
 """
 
 """
-
+from sys import exit
 from tensorflow.keras import Model
 from tensorflow.python.keras.backend import argmax
 from batches import *
@@ -14,22 +14,44 @@ import utility as ut
 def greedy_decoder(arr):
     """ Implements the greedy decoder search algorithm """
     tmp = []
+    keys_list = dic_tar.get_keys()
+
     result = []
     for elem in arr:
         biggest = tf.keras.backend.get_value(argmax(elem))
-        if biggest == 1 and tmp != []:
-            tmp.append(biggest)
+        tmp.append(keys_list[biggest])
+        if biggest == dic_tar.bi_dict["."] and tmp != []:
             result.append(tmp)
             tmp = []
-            continue
-        tmp.append(biggest)
+
     return result
 
 
 def beam_decoder(arr, k):
-    pass
+    """
+    Implements the beam search decoding algorithm
+    Returns k lists with best possible predictions
+    """
+    result = [[] for _ in range(k)]
+    sentence = [[] for _ in range(k)]
+    keys_list = dic_tar.get_keys()
+
+    for elem in arr:
+        k_candidates = tf.math.top_k(elem, k).indices
+        k_candidates = [tf.keras.backend.get_value(e) for e in k_candidates]
+        # print("k_candidates:", k_candidates)
+        for i in range(k):
+            sentence[i].append(keys_list[int(k_candidates[i])])
+            if keys_list[int(k_candidates[i])] == "." and sentence[i] != []:
+                result[i].append(sentence[i])
+                # print("result:", result)
+                sentence[i] = []
+
+    #
+    return result
 
 
+#
 def tester(sor_file, tar_file, val_src, val_tar, window=2):
     """
     Load and test the model
@@ -49,7 +71,7 @@ def tester(sor_file, tar_file, val_src, val_tar, window=2):
 
     # test_model = WordLabelerModel()
     test_model = tf.keras.models.load_model(
-        "training_1/train_model.epoch01-loss3.94.hdf5",
+        "training_101/train_model.epoch01-loss3.94.hdf5",
         custom_objects={"WordLabelerModel": WordLabelerModel, "perplexity": Perplexity},
         compile=False,
     )
@@ -73,16 +95,19 @@ def tester(sor_file, tar_file, val_src, val_tar, window=2):
 
     # prediction step
     history = test_model.predict(feed_src, batch_size=1, callbacks=None)
-    new_text = greedy_decoder(history)
-    keys_list = dic_tar.get_keys()
-    for line in range(len(new_text)):
-        for word in range(len(new_text[line])):
-            new_text[line][word] = keys_list[new_text[line][word]]
+
+    greedy_text = greedy_decoder(history)
+    beam_text = beam_decoder(history, 3)
 
     ut.save_list_as_txt(
-        os.path.join(cur_dir, "output", "greedy_prediction.de"),
-        new_text,
+        os.path.join(cur_dir, "predictions", "greedy_prediction.de"),
+        greedy_text,
     )
+    for i in range(3):
+        ut.save_list_as_txt(
+            os.path.join(cur_dir, "predictions", "greedy_prediction" + str(i) + ".de"),
+            beam_text[i],
+        )
 
 
 def main():
