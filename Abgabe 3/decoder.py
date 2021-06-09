@@ -6,6 +6,7 @@ from tensorflow.keras import Model
 from tensorflow.python.keras.backend import argmax
 from batches import *
 from custom_model import Perplexity, WordLabelerModel
+from tensorflow.keras.backend import get_value
 import tensorflow as tf
 import numpy as np
 import utility as ut
@@ -33,30 +34,33 @@ def beam_decoder(arr, k):
     Returns k lists with best possible predictions
     """
 
-    line_length = 13    # TODO: no hard
+    line_length = 13  # TODO: no hard
     # avrg line length
     # wc -lw data_exercise_3/multi30k.de | awk '{print $2/$1}'
     lines = []
 
-    while arr:
+    while arr.shape[0] >= 13:
         data = arr[:line_length]
         arr = arr[line_length:]
-        sequences = [[list(),0.0]]
+        sequences = [[list(), 0.0]]
         for elem in data:
             all_candidates = list()
-            log_elem = tf.math.log(elem)
+            k_candidates = tf.math.top_k(elem, k=k)
             for i in range(len(sequences)):
                 seq, score = sequences[i]
-                for j in range(len(elem)):
-                    candidate = [seq + [j], score - log_elem[j].numpy()]
+                for j in range(len(k_candidates)):
+                    candidate = [
+                        seq + [get_value(k_candidates.indices[j])],
+                        score - math.log(get_value(k_candidates.values[j])),
+                    ]
                     all_candidates.append(candidate)
             # order all candidates by score
-            ordered = sorted(all_candidates, key=lambda tup:tup[1])
+
+            ordered = sorted(all_candidates, key=lambda tup: tup[1])
             # select k best
             sequences = ordered[:k]
-        
-        lines.append([sequences])
 
+        lines.append(sequences)
 
     # for elem in arr:
     #     k_candidates = tf.math.top_k(elem, k).indices
@@ -73,15 +77,21 @@ def beam_decoder(arr, k):
     #
     return lines
 
-def create_text_files(lines,k):
+
+def create_text_files(lines, k):
     sentence = [[] for _ in range(k)]
     keys_list = dic_tar.get_keys()
 
     for line in lines:
         for i in range(k):
-            str_lines = map(lambda x: keys_list[x] ,line[i][0])
+            str_lines = map(lambda x: keys_list[x], line[i][0])
             sentence = " ".join(str_lines)
-            ut.save_line_as_txt(os.path.join(cur_dir, "predictions", "beam_prediction" + str(i) + ".de"), sentence)
+            ut.save_line_as_txt(
+                os.path.join(
+                    cur_dir, "predictions", "beam_prediction" + str(i) + ".de"
+                ),
+                sentence,
+            )
 
 
 #
@@ -90,21 +100,15 @@ def tester(sor_file, tar_file, val_src, val_tar, window=2):
     Load and test the model
     """
     batch = Batch()
+    src = ut.read_from_file(val_src)
+    tar = ut.read_from_file(val_tar)
 
-    # store source and target file as list of words
-    src = ut.read_from_file(sor_file)
-    trg = ut.read_from_file(tar_file)
-    val_src = ut.read_from_file(val_src)
-    val_tar = ut.read_from_file(val_tar)
-    # get word mapping for both training files and index files
-    get_word_index(src, trg)
-    # Needed for dictionary size TODO Maybe?
-    source, target = get_word_index(val_src, val_tar)
+    source, target = get_word_index(src, tar)
     batch = get_all_batches(source, target, window)
 
     # test_model = WordLabelerModel()
     test_model = tf.keras.models.load_model(
-        "training_1/train_model.epoch01-loss4.34.hdf5",
+        "training_1/train_model.epoch01-loss3.93.hdf5",
         custom_objects={"WordLabelerModel": WordLabelerModel, "perplexity": Perplexity},
         compile=False,
     )
@@ -130,12 +134,12 @@ def tester(sor_file, tar_file, val_src, val_tar, window=2):
     history = test_model.predict(feed_src, batch_size=1, callbacks=None)
 
     beam_text = beam_decoder(history, 3)
-    create_text_files(beam_text,k=3)
+    create_text_files(beam_text, k=3)
 
     return
 
     greedy_text = greedy_decoder(history)
-    
+
     ut.save_list_as_txt(
         os.path.join(cur_dir, "predictions", "greedy_prediction.de"),
         greedy_text,
@@ -143,6 +147,8 @@ def tester(sor_file, tar_file, val_src, val_tar, window=2):
 
 
 def main():
+    dic_src.get_stored(os.path.join(cur_dir, "dictionaries", "source_dictionary"))
+    dic_tar.get_stored(os.path.join(cur_dir, "dictionaries", "target_dictionary"))
     tester(
         os.path.join(cur_dir, "output", "multi30k_subword.en"),
         os.path.join(cur_dir, "output", "multi30k_subword.de"),
@@ -152,4 +158,23 @@ def main():
 
 
 if __name__ == "__main__":
+    # data = [
+    #     [0.1, 0.2, 0.3, 0.4, 0.5],
+    #     [0.5, 0.4, 0.3, 0.2, 0.1],
+    #     [0.1, 0.2, 0.3, 0.4, 0.5],
+    #     [0.5, 0.4, 0.3, 0.2, 0.1],
+    #     [0.1, 0.2, 0.3, 0.4, 0.5],
+    #     [0.5, 0.4, 0.3, 0.2, 0.1],
+    #     [0.1, 0.2, 0.3, 0.4, 0.5],
+    #     [0.5, 0.4, 0.3, 0.2, 0.1],
+    #     [0.1, 0.2, 0.3, 0.4, 0.5],
+    #     [0.5, 0.4, 0.3, 0.2, 0.1],
+    #     [0.5, 0.4, 0.3, 0.2, 0.1],
+    #     [0.5, 0.4, 0.3, 0.2, 0.1],
+    #     [0.5, 0.4, 0.3, 0.2, 0.1],
+    # ]
+    # print(data)
+
+    # out = beam_decoder(np.array(data), 3)
+    # print(out)
     main()
