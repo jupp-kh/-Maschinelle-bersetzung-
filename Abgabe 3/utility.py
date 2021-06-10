@@ -94,6 +94,7 @@ def save_list_as_txt(file_des, data_list):
                 write_f.write(str(word) + " ")
             write_f.write("\n")
 
+
 def save_line_as_txt(file_des, line):
     """ Saves data_line as csv in file_des """
     mode = ""
@@ -103,6 +104,5 @@ def save_line_as_txt(file_des, line):
         mode = "w"
 
     with open(file_des, mode, encoding="utf-8") as write_f:
-        for word in line:
-            write_f.write(str(word) + " ")
+        write_f.write(line)
         write_f.write("\n")
