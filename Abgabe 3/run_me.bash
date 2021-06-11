@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 
 ########## parameters ##########
 
@@ -43,7 +43,7 @@ if [ ! -z $1 ]
 then 
     if [ $1 = "--go" ] 
     then 
-        args="${reports} ${oper} ${source_train_file} ${target_train_file} ${source_val_file} ${target_val_file} ${cp_freq} ${fractional_lr} ${tb}"
+        args="${reports} ${oper} ${source_train_file} ${target_train_file} ${source_val_file} ${target_val_file} ${cp_freq} ${fractional_lr} ${tb} False False"
 
         python3 test_nn.py ${args} 
         exit

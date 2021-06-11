@@ -239,7 +239,8 @@ def main():
     # TODO NEXT: function for hyperparameters?
 
     # check local devices
-    integrate_gpu()
+    if not sys.argv[11].lower()=='true':
+        integrate_gpu()
 
     # running BPE with 7k operations on dev text
     # DONE: this part has been previously done! uncomment
@@ -247,12 +248,15 @@ def main():
     # run_bpe(sys.args[2]) # system argument holds number of operations in bpe
 
     ## Run neural network
-    run_nn(
-        os.path.join(cur_dir, "output", sys.argv[3]),
-        os.path.join(cur_dir, "output", sys.argv[4]),
-        os.path.join(cur_dir, "output", sys.argv[5]),
-        os.path.join(cur_dir, "output", sys.argv[6]),
-    )
+    if sys.argv[10].lower()=='true':
+        print('----------------- Starting hyperparametersearch ... -----------------')
+    else:
+        run_nn(
+            os.path.join(cur_dir, "output", sys.argv[3]),
+            os.path.join(cur_dir, "output", sys.argv[4]),
+            os.path.join(cur_dir, "output", sys.argv[5]),
+            os.path.join(cur_dir, "output", sys.argv[6]),
+        )
 
 
 main()
