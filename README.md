@@ -57,7 +57,7 @@ In diesem Übungsblatt besteht die Aufgabe darin, erste Features des Feed-Forwar
 - [x] Modelle nach Userauswahl speichern.
 - [x] Metriken wie Accurracy und Perplexity in regelmäßigen Abständen ausgeben
 - [x] Auf einem gegebenen Entwicklungsdaten alle n Updates das Modell auswerten
-- [ ] Netzwerkstruktur deutlich machen (details im Aufgabenblatt + Tensorboard)
+- [x] Netzwerkstruktur deutlich machen (details im Aufgabenblatt + Tensorboard)
 - [x] BPE mit 7k Zusammenzugoperationen testen, um den niedrigsten Perplexity Wert den des Modells Entwicklungsdaten herauszufinden. 
 
 ## Aufgabenblatt 4 
@@ -65,8 +65,8 @@ In diesem Übungsblatt besteht die Aufgabe darin, erste Features des Feed-Forwar
 In diesem Übungsblatt besteht die Aufgabe darin, das Programm in die Lage zu versetzen, sinnvolle Modellteile (z. B. ein Subwortzerlegungsmodell oder ein Vokabular) zu speichern und zu laden. Zentrale Hyperparameter sollen nicht im Programmcode vorgegeben werden, sondern vom Benutzer eingestellt werden können. Als Trainingsdaten werden die Dateien multi30k.de.gz und multi30k.en.gz bereitgestellt. Für die Entwicklung werden multi30k.dev.de und multi30k.dev.de verwendet. 
 
 - [ ] Score des Feedforward Modells für jedes Satzpaar ausgeben
-- [ ] Übersetzung aus Grundlage der Vorlesung erstellen, indem ein trainiertes Modell geladen wird und die beide Methoden greedy search sowie beam search durchführen. 
+- [x] Übersetzung aus Grundlage der Vorlesung erstellen, indem ein trainiertes Modell geladen wird und die beide Methoden greedy search sowie beam search durchführen. 
 - [ ] Mithilfe einer automatisierte Methode (Python oder Bash) den BLEU Wert von jedem Checkpoint bestimmen. 
 - [ ] BLEU Score bei verschiedene Beamgrößen {1, 5, 10, 50} testen.
 - [ ] Drei Verschiedene durchläufe mit unterschiedlichen Random Seed auswerten. BLEU und Perplexity Werte auf den Entwicklungsdaten über die Checkpoints plotten.
-- [ ] Vortragsthema aussuchen! 
+- [x] Vortragsthema aussuchen! 
