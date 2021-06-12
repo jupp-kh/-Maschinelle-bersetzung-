@@ -9,9 +9,9 @@ import os
 #       2.  -   Hyperparameter Search & Safe best model with Keras Tuner
 #
 #   Flag explanations
-#       --go        :
-#       --hypparam  :
-#       --gpu       :
+#       --go        :   start the script (without the flag the program will NOT start)
+#       --hypparam  :   activates hyperparameter search mode
+#       --gpu       :   activates gpu usage
 #
 ###############################################
 
@@ -20,16 +20,19 @@ arguments = {
     'go': False,
     'hypparamsearch': False,
     'gpu': False,
+    'val_on_dev': False,
 }
 
 args = sys.argv[1:]
 for arg in args:
     if arg == '--go':
         arguments['go'] = True
-    elif arg == '--hypparam':
+    elif arg == '--hps':
         arguments['hypparamsearch'] = True
     elif arg == '--gpu':
         arguments['gpu'] = True
+    elif arg == '--devval':
+        arguments['val_on_dev'] = True
     else:
         raise ValueError('Invalid command line argument/flag! Please use valid set of flags/arguments!')
 
@@ -43,7 +46,7 @@ test_nn_args=f"{config.params['reports']} {config.params['oper']} {config.paths[
             f"{config.params['cp_freq']} {config.params['fractional_lr']} {config.params['tb']}"
 
 # Generate string with bool from flag existance
-flags = f" {arguments['hypparamsearch']} {arguments['gpu']}"
+flags = f" {arguments['hypparamsearch']} {arguments['gpu']} {arguments['val_on_dev']}"
 
 # run script with parameters
-os.system("python3 test_nn.py "+test_nn_args)
+os.system("python3 test_nn.py "+test_nn_args+flags)

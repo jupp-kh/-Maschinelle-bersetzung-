@@ -12,6 +12,9 @@ from dictionary import dic_tar, dic_src
 
 from tensorflow.python.ops.variables import trainable_variables
 
+# import config file for hyperparameter search space
+import config_custom_train as config
+
 
 # globals sit here
 
@@ -49,7 +52,7 @@ class Perplexity(tf.keras.metrics.Metric):
 
         # Remember self.perplexity is a tensor (tf.Variable),
         # FIXME: there is an issue with updating perplexity using this class :(
-        self.perplexity = self._calculate_perplexity(y_true, y_pred)
+        self.perplexity.assign(self._calculate_perplexity(y_true, y_pred))
 
     def result(self):
         return self.perplexity
@@ -72,18 +75,29 @@ class MetricsCallback(tf.keras.callbacks.Callback):
             outlog = logs
             outlog["perplexity"] = float(tf.exp(logs["loss"]).numpy())
             for key in outlog:
-                outlog[key] = "{:.2f}".format(outlog[key])
+                outlog[key] = float("{:.2f}".format(outlog[key]))
             print("After", self.seen, "batches:", outlog)
+
+    # call back seems to update perplexity at a better rate
+    def on_epoch_end(self, epoch, logs):
+        outlog = logs
+        outlog["perplexity"] = float(tf.exp(logs["loss"]).numpy())
+        print("\n"+"-"*80)
+        print("\tAfter Epoch", epoch+1, "we got the following loss and metrics:")
+        for key in outlog:
+            outlog[key] = float("{:.3f}".format(outlog[key]))
+            print("\t\t"+key+":\t",outlog[key])
+        print("-"*80+"\n")
 
 
 # class declaration
 class WordLabelerModel(Model):
     # initialise model and build layers immediatly.
-    def __init__(self, window_size=2):
+    def __init__(self, window_size=2, **kwargs):
         #     # building model
         input_point_1 = Input(shape=(2 * window_size + 1,), name="I0")
 
-        x = Embedding(len(dic_src), 250)(input_point_1)
+        x = Embedding(len(dic_src), 250, name="EmbeddedSource")(input_point_1)
         x = Dense(units=200, activation="relu", name="FullyConSource")(x)
 
         input_point_2 = Input(shape=(window_size,), name="I1")
@@ -98,7 +112,7 @@ class WordLabelerModel(Model):
 
         # second fully connected layer / projection
         fully_connected_two = Dense(
-            200, activation=None, input_shape=(len(dic_tar), 1)
+            200, activation=None, name="FullyConnectedLayer2", input_shape=(len(dic_tar), 1)
         )(fully_connected_one)
 
         fully_connected_two = tf.keras.layers.Flatten(name="Flatten")(
@@ -183,6 +197,92 @@ class WordLabelerModel(Model):
         # Note that it will include the loss (tracked in self.metrics).
         return {m.name: m.result() for m in self.metrics}
 
+
+def build_search_model(hp):
+    """
+        Method to pass to hyperparameter search of Keras Tuner Class to build the model
+
+        @param hp: hyperparameters
+        @return model: Tensorflow model
+    """
+
+    output_dim_emp = hp.Int(config.hp_space['output_dim_emb']['name'],
+                                        min_value=config.hp_space['output_dim_emb']['min_value'],
+                                        max_value=config.hp_space['output_dim_emb']['max_value'],
+                                        step=config.hp_space['output_dim_emb']['step'])
+    units_fullcon = hp.Int(config.hp_space['units_fullcon']['name'],
+                                        min_value=config.hp_space['units_fullcon']['min_value'],
+                                        max_value=config.hp_space['units_fullcon']['max_value'],
+                                        step=config.hp_space['units_fullcon']['step'])
+
+    input_point_1 = Input(shape=(2 * config.hp_space['w'] + 1,), name="I0")
+    x = Embedding(
+        len(dic_src),
+        output_dim=output_dim_emp,
+        name="EmbeddedSource")(input_point_1)
+    x = Dense(
+        units=units_fullcon,
+        activation=hp.Choice(config.hp_space['activation_functions']['name'], values=config.hp_space['activation_functions']['functions']),
+        name="FullyConSource")(x)
+
+    input_point_2 = Input(shape=(config.hp_space['w'],), name="I1")
+    y = Embedding(
+        len(dic_tar),
+        output_dim=output_dim_emp,
+        name="EmbeddedTarget")(input_point_2)
+    y = Dense(
+        units=units_fullcon,
+        activation=hp.Choice(config.hp_space['activation_functions']['name'], values=config.hp_space['activation_functions']['functions']),
+        name="FullyConTarget")(y)
+
+    fully_concat = Concatenate(axis=1, name="ConcatLayer")([x, y])
+
+    fully_connected_one = Dense(
+        units=hp.Int(config.hp_space['units_fullcon_1']['name'],
+                                        min_value=config.hp_space['units_fullcon_1']['min_value'],
+                                        max_value=config.hp_space['units_fullcon_1']['max_value'],
+                                        step=config.hp_space['units_fullcon_1']['step']),
+        activation=hp.Choice(config.hp_space['activation_functions']['name'], values=config.hp_space['activation_functions']['functions']),
+        name="FullyConnectedLayer1"
+    )(fully_concat)
+
+    # second fully connected layer / projection
+    fully_connected_two = Dense(
+        units=hp.Int(config.hp_space['units_fullcon_2']['name'],
+                                        min_value=config.hp_space['units_fullcon_2']['min_value'],
+                                        max_value=config.hp_space['units_fullcon_2']['max_value'],
+                                        step=config.hp_space['units_fullcon_2']['step']),
+        activation=None,
+        name="FullyConnectedLayer2",
+        input_shape=(len(dic_tar), 1)
+    )(fully_connected_one)
+
+    fully_connected_two = tf.keras.layers.Flatten(name="Flatten")(
+        fully_connected_two
+    )
+    # softmax layer
+    softmax_layer = Dense(len(dic_tar), activation="softmax", name="Softmax")(
+        fully_connected_two
+    )
+
+    # build model and specify input and output points.
+    model = Model(inputs=[input_point_1, input_point_2], outputs=[softmax_layer])
+
+    # compile model with optimizer, loss and metrics
+    print("--- Model ready to compile")
+    from tensorflow.keras.optimizers import Adam
+    model.compile(
+        optimizer=Adam(
+            hp.Choice(config.hp_space['learning_rates']['name'], values=config.hp_space['learning_rates']['lrs'])
+        ),
+        loss="sparse_categorical_crossentropy",
+        metrics=[
+            "accuracy",
+            #Perplexity(),
+        ],
+    )
+    print("--- Model compiled")
+    return model
 
 # class FeedForward:
 #     """

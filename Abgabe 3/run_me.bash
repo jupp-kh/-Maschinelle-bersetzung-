@@ -35,15 +35,21 @@ fractional_lr="False"
 ## print tensorboard
 tb="True"
 
+## start hyperparametersearch
+hps="False"
 
+## use gpu
+gpu="False"
 
+## use dev as validation data during training/hyperparametersearch (right now just possible in hp search)
+val_on_dev="False"
 
 #######    Now we call test_nn with the specified parameters     #######
 if [ ! -z $1 ]
 then 
-    if [ $1 = "--go" ] 
+    if [ $1 = "--go" ]
     then 
-        args="${reports} ${oper} ${source_train_file} ${target_train_file} ${source_val_file} ${target_val_file} ${cp_freq} ${fractional_lr} ${tb} False False"
+        args="${reports} ${oper} ${source_train_file} ${target_train_file} ${source_val_file} ${target_val_file} ${cp_freq} ${fractional_lr} ${tb} ${hps} ${gpu} ${val_on_dev}"
 
         python3 test_nn.py ${args} 
         exit
