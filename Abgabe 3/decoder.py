@@ -1,17 +1,17 @@
 """
 
 """
-from metrics import compare_bleu_scores
-from encoder import rename_me
+# from metrics import compare_bleu_scores
+# from encoder import rename_me
 from sys import exit
 from tensorflow.keras import Model
 from tensorflow.python.keras.backend import argmax
 from batches import *
-from custom_model import Perplexity, WordLabelerModel
 from tensorflow.keras.backend import get_value
 import tensorflow as tf
 import numpy as np
 import utility as ut
+import custom_model
 
 
 def greedy_decoder_outdated(arr):
@@ -115,14 +115,15 @@ def greedy_decoder(test_model, source, target):
     print(history)
 
     dic_keys = dic_tar.get_keys()
-
+    path = os.path.join(cur_dir, "predictions", "greedy_prediction.de")
     # save greedy search decoder data
     ut.save_list_as_txt(
-        os.path.join(cur_dir, "predictions", "greedy_prediction.de"),
+        path,
         map(lambda x: [dic_keys[i] for i in x], greedy_values),
     )
     # beam_text = beam_decoder(pred_values, 3)
     # create_text_files(beam_text, k=3)
+    return path
 
 
 def beam_decoder(test_model, source, target, k):
@@ -212,7 +213,7 @@ def calc_scores(test_model, source, target):
 
 
 #
-def loader(sor_file, tar_file, val_src, val_tar, window=2, mode="b"):
+def loader(model, val_src, val_tar, window=2, mode="b"):
     """
     Load and test the model
     """
@@ -222,11 +223,9 @@ def loader(sor_file, tar_file, val_src, val_tar, window=2, mode="b"):
     source, target = get_word_index(src, tar)
     # batch = get_all_batches(source, target, window)
 
-    # test_model = WordLabelerModel()
-    test_model = tf.keras.models.load_model(
-        "training_1/train_model.epoch01-loss3.93.hdf5",
-        custom_objects={"WordLabelerModel": WordLabelerModel, "perplexity": Perplexity},
-        compile=False,
+    test_model = custom_model.WordLabelerModel()
+    test_model.load_weights(
+        "training_1/train_model.epoch11-loss0.50.hdf5",
     )
     print(test_model.summary())
     test_model.compile(
@@ -235,14 +234,14 @@ def loader(sor_file, tar_file, val_src, val_tar, window=2, mode="b"):
         # using categorical cross entropy from keras provided one-hot vectors
         metrics=[
             "accuracy",
-            Perplexity(),
+            custom_model.Perplexity(),
         ],
     )
 
     if mode == "b":
         beam_decoder(test_model, source, target, 3)  # use beam search
     if mode == "g":
-        greedy_decoder(test_model, source, target)  # use greedy search
+        return greedy_decoder(test_model, source, target)  # use greedy search
     if mode == "s":
         calc_scores(test_model, source, target)  # calculate Score
 
@@ -261,11 +260,10 @@ def main():
 
     # load model and predict outputs
     loader(
-        os.path.join(cur_dir, "output", "multi30k_subword.en"),
-        os.path.join(cur_dir, "output", "multi30k_subword.de"),
+        "training_1/train_model.epoch11-loss0.50.hdf5",
         os.path.join(cur_dir, "output", "multi30k.dev_subword.en"),
         os.path.join(cur_dir, "output", "multi30k.dev_subword.de"),
-        mode="s",
+        mode="g",
     )
 
 

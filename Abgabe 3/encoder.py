@@ -219,6 +219,7 @@ def run_bpe(*oper):
 
 
 def rename_me():
+    """reverts bpe for files in predictions"""
     for i in range(5):
         revert_bpe(
             os.path.join(

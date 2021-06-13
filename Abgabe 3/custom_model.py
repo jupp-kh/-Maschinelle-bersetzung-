@@ -5,10 +5,18 @@ Contains metric class Perplexity
 
 * Contains network archictecture for word embedding: Modell
 """
-import tensorflow as tf
+from metrics import met_bleu
 from tensorflow.keras.layers import Input, Concatenate, Embedding, Dense
 from tensorflow.keras.models import Model
+import tensorflow as tf
 from dictionary import dic_tar, dic_src
+import os
+from utility import cur_dir
+import sys
+import decoder
+import glob
+
+# from decoder import loader, greedy_decoder
 
 from tensorflow.python.ops.variables import trainable_variables
 
@@ -76,18 +84,55 @@ class MetricsCallback(tf.keras.callbacks.Callback):
             outlog["perplexity"] = float(tf.exp(logs["loss"]).numpy())
             for key in outlog:
                 outlog[key] = float("{:.3f}".format(outlog[key]))
-            print("After", self.seen, "batches", "(Batch "+str(batch)+" in Epoch):", outlog)
+            print(
+                "After",
+                self.seen,
+                "batches",
+                "(Batch " + str(batch) + " in Epoch):",
+                outlog,
+            )
 
     # call back seems to update perplexity at a better rate
     def on_epoch_end(self, epoch, logs):
         outlog = logs
         outlog["perplexity"] = float(tf.exp(logs["loss"]).numpy())
-        print("\n"+"-"*80)
-        print("\tAfter Epoch", epoch+1, "we got the following loss and metrics:")
+        print("\n" + "-" * 80)
+        print("\tAfter Epoch", epoch + 1, "we got the following loss and metrics:")
         for key in outlog:
             outlog[key] = float("{:.3f}".format(outlog[key]))
-            print("\t\t"+key+":\t",outlog[key])
-        print("-"*80+"\n")
+            print("\t\t" + key + ":\t", outlog[key])
+        print("-" * 80 + "\n")
+
+
+class BleuCallback(tf.keras.callbacks.Callback):
+    def __init__(self, check_after):
+        super().__init__()
+        self.check_after = check_after
+        self.seen = 0
+        self.prev_bleu = 0
+        self.path = os.path.join(cur_dir, "training_1")
+
+    def on_train_begin(self, logs):
+        dev_1 = os.path.join(cur_dir, "output", sys.argv[5])
+        dev_2 = os.path.join(cur_dir, "output", sys.argv[6])
+        if self.prev_bleu == 0:
+            if any(os.scandir(self.path)):
+                max_file = max(glob.glob(self.path + "/*hdf5"), key=os.path.getctime)
+            data_path = decoder.loader(max_file, dev_1, dev_2, mode="g")
+            self.bleu = met_bleu(sys.argv[6], data_path)
+
+    def on_batch_end(self, batch, logs):
+        dev_1 = os.path.join(cur_dir, "output", sys.argv[5])
+        dev_2 = os.path.join(cur_dir, "output", sys.argv[6])
+        self.seen += 1
+        if self.seen % self.check_after == 0:
+            path = decoder.greedy_decoder(self.model, dev_1, dev_2)
+            tmp_bleu = met_bleu(sys.argv[6], path)
+            if tmp_bleu < self.prev_bleu:
+                # quit training!
+                self.model.stop_training = True
+            else:
+                self.prev_bleu = tmp_bleu
 
 
 # class declaration
@@ -112,7 +157,10 @@ class WordLabelerModel(Model):
 
         # second fully connected layer / projection
         fully_connected_two = Dense(
-            200, activation=None, name="FullyConnectedLayer2", input_shape=(len(dic_tar), 1)
+            200,
+            activation=None,
+            name="FullyConnectedLayer2",
+            input_shape=(len(dic_tar), 1),
         )(fully_connected_one)
 
         fully_connected_two = tf.keras.layers.Flatten(name="Flatten")(
@@ -200,66 +248,81 @@ class WordLabelerModel(Model):
 
 def build_search_model(hp):
     """
-        Method to pass to hyperparameter search of Keras Tuner Class to build the model
+    Method to pass to hyperparameter search of Keras Tuner Class to build the model
 
-        @param hp: hyperparameters
-        @return model: Tensorflow model
+    @param hp: hyperparameters
+    @return model: Tensorflow model
     """
 
-    output_dim_emp = hp.Int(config.hp_space['output_dim_emb']['name'],
-                                        min_value=config.hp_space['output_dim_emb']['min_value'],
-                                        max_value=config.hp_space['output_dim_emb']['max_value'],
-                                        step=config.hp_space['output_dim_emb']['step'])
-    units_fullcon = hp.Int(config.hp_space['units_fullcon']['name'],
-                                        min_value=config.hp_space['units_fullcon']['min_value'],
-                                        max_value=config.hp_space['units_fullcon']['max_value'],
-                                        step=config.hp_space['units_fullcon']['step'])
+    output_dim_emp = hp.Int(
+        config.hp_space["output_dim_emb"]["name"],
+        min_value=config.hp_space["output_dim_emb"]["min_value"],
+        max_value=config.hp_space["output_dim_emb"]["max_value"],
+        step=config.hp_space["output_dim_emb"]["step"],
+    )
+    units_fullcon = hp.Int(
+        config.hp_space["units_fullcon"]["name"],
+        min_value=config.hp_space["units_fullcon"]["min_value"],
+        max_value=config.hp_space["units_fullcon"]["max_value"],
+        step=config.hp_space["units_fullcon"]["step"],
+    )
 
-    input_point_1 = Input(shape=(2 * config.hp_space['w'] + 1,), name="I0")
-    x = Embedding(
-        len(dic_src),
-        output_dim=output_dim_emp,
-        name="EmbeddedSource")(input_point_1)
+    input_point_1 = Input(shape=(2 * config.hp_space["w"] + 1,), name="I0")
+    x = Embedding(len(dic_src), output_dim=output_dim_emp, name="EmbeddedSource")(
+        input_point_1
+    )
     x = Dense(
         units=units_fullcon,
-        activation=hp.Choice(config.hp_space['activation_functions']['name'], values=config.hp_space['activation_functions']['functions']),
-        name="FullyConSource")(x)
+        activation=hp.Choice(
+            config.hp_space["activation_functions"]["name"],
+            values=config.hp_space["activation_functions"]["functions"],
+        ),
+        name="FullyConSource",
+    )(x)
 
-    input_point_2 = Input(shape=(config.hp_space['w'],), name="I1")
-    y = Embedding(
-        len(dic_tar),
-        output_dim=output_dim_emp,
-        name="EmbeddedTarget")(input_point_2)
+    input_point_2 = Input(shape=(config.hp_space["w"],), name="I1")
+    y = Embedding(len(dic_tar), output_dim=output_dim_emp, name="EmbeddedTarget")(
+        input_point_2
+    )
     y = Dense(
         units=units_fullcon,
-        activation=hp.Choice(config.hp_space['activation_functions']['name'], values=config.hp_space['activation_functions']['functions']),
-        name="FullyConTarget")(y)
+        activation=hp.Choice(
+            config.hp_space["activation_functions"]["name"],
+            values=config.hp_space["activation_functions"]["functions"],
+        ),
+        name="FullyConTarget",
+    )(y)
 
     fully_concat = Concatenate(axis=1, name="ConcatLayer")([x, y])
 
     fully_connected_one = Dense(
-        units=hp.Int(config.hp_space['units_fullcon_1']['name'],
-                                        min_value=config.hp_space['units_fullcon_1']['min_value'],
-                                        max_value=config.hp_space['units_fullcon_1']['max_value'],
-                                        step=config.hp_space['units_fullcon_1']['step']),
-        activation=hp.Choice(config.hp_space['activation_functions']['name'], values=config.hp_space['activation_functions']['functions']),
-        name="FullyConnectedLayer1"
+        units=hp.Int(
+            config.hp_space["units_fullcon_1"]["name"],
+            min_value=config.hp_space["units_fullcon_1"]["min_value"],
+            max_value=config.hp_space["units_fullcon_1"]["max_value"],
+            step=config.hp_space["units_fullcon_1"]["step"],
+        ),
+        activation=hp.Choice(
+            config.hp_space["activation_functions"]["name"],
+            values=config.hp_space["activation_functions"]["functions"],
+        ),
+        name="FullyConnectedLayer1",
     )(fully_concat)
 
     # second fully connected layer / projection
     fully_connected_two = Dense(
-        units=hp.Int(config.hp_space['units_fullcon_2']['name'],
-                                        min_value=config.hp_space['units_fullcon_2']['min_value'],
-                                        max_value=config.hp_space['units_fullcon_2']['max_value'],
-                                        step=config.hp_space['units_fullcon_2']['step']),
+        units=hp.Int(
+            config.hp_space["units_fullcon_2"]["name"],
+            min_value=config.hp_space["units_fullcon_2"]["min_value"],
+            max_value=config.hp_space["units_fullcon_2"]["max_value"],
+            step=config.hp_space["units_fullcon_2"]["step"],
+        ),
         activation=None,
         name="FullyConnectedLayer2",
-        input_shape=(len(dic_tar), 1)
+        input_shape=(len(dic_tar), 1),
     )(fully_connected_one)
 
-    fully_connected_two = tf.keras.layers.Flatten(name="Flatten")(
-        fully_connected_two
-    )
+    fully_connected_two = tf.keras.layers.Flatten(name="Flatten")(fully_connected_two)
     # softmax layer
     softmax_layer = Dense(len(dic_tar), activation="softmax", name="Softmax")(
         fully_connected_two
@@ -271,18 +334,23 @@ def build_search_model(hp):
     # compile model with optimizer, loss and metrics
     print("--- Model ready to compile")
     from tensorflow.keras.optimizers import Adam
+
     model.compile(
         optimizer=Adam(
-            hp.Choice(config.hp_space['learning_rates']['name'], values=config.hp_space['learning_rates']['lrs'])
+            hp.Choice(
+                config.hp_space["learning_rates"]["name"],
+                values=config.hp_space["learning_rates"]["lrs"],
+            )
         ),
         loss="sparse_categorical_crossentropy",
         metrics=[
             "accuracy",
-            #Perplexity(),
+            # Perplexity(),
         ],
     )
     print("--- Model compiled")
     return model
+
 
 # class FeedForward:
 #     """

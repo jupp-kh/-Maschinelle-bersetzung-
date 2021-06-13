@@ -24,15 +24,24 @@ from dictionary import dic_src, dic_tar
 from kerastuner.tuners import RandomSearch
 import config_custom_train as config
 
+# remove us
+import glob
+import decoder
+
 # globals sit here.
-from custom_model import MetricsCallback, WordLabelerModel, build_search_model
+from custom_model import (
+    BleuCallback,
+    MetricsCallback,
+    WordLabelerModel,
+    build_search_model,
+)
 from utility import cur_dir
 
 # NOTE: using loop to do the feed forward is slow because loops in py are inefficient.
 #   -> use %timeit !?
 
 
-def get_callback_list(cp_freq=1000, tb_vis=False, lr_frac=False, is_val=False):
+def get_callback_list(cp_freq=1, tb_vis=False, lr_frac=False, is_val=False):
     """
     Returns list of callback for validation and training
     """
@@ -41,6 +50,8 @@ def get_callback_list(cp_freq=1000, tb_vis=False, lr_frac=False, is_val=False):
     tb_log = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     tb_log = os.path.join(cur_dir, tb_log)
     checkpoint_path = os.path.join(cur_dir, checkpoint_path)
+
+    bleu_callback = BleuCallback(cp_freq)
 
     # sys.arg[1] tells python to print training reports every n batches
     # specify callbacks to store metrics and logs
@@ -88,8 +99,9 @@ def get_callback_list(cp_freq=1000, tb_vis=False, lr_frac=False, is_val=False):
     callback_list = [
         call_for_metrics,
         early_stopping,
-        #cp_callback
-        ]
+        cp_callback,
+        bleu_callback,
+    ]
 
     if lr_frac:
         callback_list.append(learning_rate_reduction)
@@ -224,11 +236,11 @@ def run_nn(sor_file, tar_file, val_src, val_tar, window=2, val_on_dev=False):
         train_model,
         dataset if val_on_dev else dataset_train,
         val_dataset if val_on_dev else dataset_val,
-        )
+    )
 
     # save model
-    #train_model.save("model.h5")
-    #print("**** Saved model to disk (after training) ****")
+    # train_model.save("model.h5")
+    # print("**** Saved model to disk (after training) ****")
 
     # print the returned metrics from our method
     # end of training
@@ -239,8 +251,9 @@ def run_nn(sor_file, tar_file, val_src, val_tar, window=2, val_on_dev=False):
     print(val_history)
 
     save_name = f"model_val-loss-{val_history[0]:.3f}_val-acc-{val_history[1]:.3f}_val-per-{val_history[2]:.3f}"
-    train_model.save(save_name+".h5")
+    train_model.save(save_name + ".h5")
     print("**** Saved model to disk (after eval) ****")
+
 
 def start_hp_search(tuner, dataset_train, dataset_val):
     """
@@ -253,18 +266,20 @@ def start_hp_search(tuner, dataset_train, dataset_val):
 
     # run search()
     # start search
-    history = tuner.search(dataset_train,
-             epochs=config.search_params['epochs'],
-             validation_data=dataset_val,
-             callbacks=callback_list,
-             verbose=0,
-             )
+    history = tuner.search(
+        dataset_train,
+        epochs=config.search_params["epochs"],
+        validation_data=dataset_val,
+        callbacks=callback_list,
+        verbose=0,
+    )
 
     return history, tuner
 
+
 def hyperparam_search(sor_file, tar_file, val_src, val_tar, window=2, val_on_dev=True):
     """
-        Starts hyperparameter search, saves best model, best params and evaluates best model
+    Starts hyperparameter search, saves best model, best params and evaluates best model
     """
     batch = Batch()
     # BUG: REQ das Label muss während das lernen immer bekannt sein. S9 Architektur in letzte VL
@@ -286,11 +301,11 @@ def hyperparam_search(sor_file, tar_file, val_src, val_tar, window=2, val_on_dev
     # initialize tuner
     tuner = RandomSearch(
         build_search_model,
-        objective='val_accuracy',
-        max_trials=config.search_params['max_trials'],
-        executions_per_trial=config.search_params['executions_per_trial'],
-        directory=config.search_params['directory_name'],
-        project_name='hps_feedforward_translator'
+        objective="val_accuracy",
+        max_trials=config.search_params["max_trials"],
+        executions_per_trial=config.search_params["executions_per_trial"],
+        directory=config.search_params["directory_name"],
+        project_name="hps_feedforward_translator",
     )
 
     # print search space summary
@@ -332,12 +347,11 @@ def hyperparam_search(sor_file, tar_file, val_src, val_tar, window=2, val_on_dev
         200, drop_remainder=True
     )
 
-
     # preprocessing data
     batch_count = math.floor(batch.size / 200)
     batch_count_train = int(batch_count * 0.9)
     dataset.shuffle(int(batch_count * 1.1))
-    
+
     if not val_on_dev:
         dataset_train = dataset.take(batch_count_train)  # training data
         dataset_val = dataset.skip(batch_count_train)  # validation data
@@ -347,11 +361,11 @@ def hyperparam_search(sor_file, tar_file, val_src, val_tar, window=2, val_on_dev
         tuner,
         dataset if val_on_dev else dataset_train,
         val_dataset if val_on_dev else dataset_val,
-        )
+    )
 
     # get best model(s) and hyperparameters from search
     best_model = tuner.get_best_models(num_models=1)[0]
-    best_model.save('best_model/best_model.h5')
+    best_model.save("best_model/best_model.h5")
     best_hyperparameters = tuner.get_best_hyperparameters(1)[0]
     print("\n------------ Best params: ------------")
     print(best_hyperparameters)
@@ -370,7 +384,6 @@ def hyperparam_search(sor_file, tar_file, val_src, val_tar, window=2, val_on_dev
     print(val_history)
 
 
-
 def integrate_gpu():
     """
     Method to check whether gpu should remain integrated
@@ -386,8 +399,13 @@ def main():
     # TODO NEXT: function for hyperparameters?
 
     # check local devices
-    print("-"*50,"\nNum GPUs Available: ", len(tf.config.experimental.list_physical_devices('GPU')),"\n"+"-"*50)
-    if not (sys.argv[11].lower()=='true'):
+    print(
+        "-" * 50,
+        "\nNum GPUs Available: ",
+        len(tf.config.experimental.list_physical_devices("GPU")),
+        "\n" + "-" * 50,
+    )
+    if not (sys.argv[11].lower() == "true"):
         integrate_gpu()
 
     # running BPE with 7k operations on dev text
@@ -396,14 +414,14 @@ def main():
     # run_bpe(sys.args[2]) # system argument holds number of operations in bpe
 
     ## Run neural network
-    if sys.argv[10].lower()=='true':
-        print('----------------- Starting hyperparametersearch ... -----------------')
+    if sys.argv[10].lower() == "true":
+        print("----------------- Starting hyperparametersearch ... -----------------")
         hyperparam_search(
             os.path.join(cur_dir, "output", sys.argv[3]),
             os.path.join(cur_dir, "output", sys.argv[4]),
             os.path.join(cur_dir, "output", sys.argv[5]),
             os.path.join(cur_dir, "output", sys.argv[6]),
-            val_on_dev=(sys.argv[11].lower()=='true'),
+            val_on_dev=(sys.argv[11].lower() == "true"),
         )
     else:
         run_nn(
@@ -411,8 +429,18 @@ def main():
             os.path.join(cur_dir, "output", sys.argv[4]),
             os.path.join(cur_dir, "output", sys.argv[5]),
             os.path.join(cur_dir, "output", sys.argv[6]),
-            val_on_dev=(sys.argv[11].lower()=='true'),
+            val_on_dev=(sys.argv[11].lower() == "true"),
         )
 
 
-main()
+def l():
+    path = os.path.join(cur_dir, "training_1")
+    dev_1 = os.path.join(cur_dir, "output", sys.argv[5])
+    dev_2 = os.path.join(cur_dir, "output", sys.argv[6])
+    max_file = max(glob.glob(path + "/*hdf5"), key=os.path.getctime)
+    data_path = decoder.loader(max_file, dev_1, dev_2, mode="g")
+
+
+if __name__ == "__main__":
+    main()
+    # l()
