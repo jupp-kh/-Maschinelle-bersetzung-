@@ -52,7 +52,7 @@ class Perplexity(tf.keras.metrics.Metric):
 
         # Remember self.perplexity is a tensor (tf.Variable),
         # FIXME: there is an issue with updating perplexity using this class :(
-        self.perplexity.assign(self._calculate_perplexity(y_true, y_pred))
+        self.perplexity = self._calculate_perplexity(y_true, y_pred)
 
     def result(self):
         return self.perplexity
@@ -75,8 +75,8 @@ class MetricsCallback(tf.keras.callbacks.Callback):
             outlog = logs
             outlog["perplexity"] = float(tf.exp(logs["loss"]).numpy())
             for key in outlog:
-                outlog[key] = float("{:.2f}".format(outlog[key]))
-            print("After", self.seen, "batches:", outlog)
+                outlog[key] = float("{:.3f}".format(outlog[key]))
+            print("After", self.seen, "batches", "(Batch "+str(batch)+" in Epoch):", outlog)
 
     # call back seems to update perplexity at a better rate
     def on_epoch_end(self, epoch, logs):

@@ -71,7 +71,7 @@ def get_callback_list(cp_freq=1000, tb_vis=False, lr_frac=False, is_val=False):
         # monitor defines which metric we are monitoring
         monitor="val_accuracy",
         # how many evaluations of no improvement do we wait until we change the LR (learning rate)
-        patience=3,
+        patience=4,
         restore_best_weights=True,
     )
 
@@ -85,7 +85,11 @@ def get_callback_list(cp_freq=1000, tb_vis=False, lr_frac=False, is_val=False):
         embeddings_freq=1,
     )
 
-    callback_list = [call_for_metrics, early_stopping, cp_callback]
+    callback_list = [
+        call_for_metrics,
+        early_stopping,
+        #cp_callback
+        ]
 
     if lr_frac:
         callback_list.append(learning_rate_reduction)
@@ -130,14 +134,10 @@ def train_by_fit(train_model, dataset_train, dataset_val):
         cp_freq=sys.argv[7], lr_frac=sys.argv[8], tb_vis=sys.argv[9], is_val=False
     )
 
-    for x, y in dataset_train:
-        print(x, y)
-        break
-
     # run fit()
     history = train_model.fit(
         dataset_train,
-        epochs=11,
+        epochs=18,
         callbacks=callback_list,
         verbose=0,
         validation_data=dataset_val,
@@ -145,7 +145,7 @@ def train_by_fit(train_model, dataset_train, dataset_val):
     return history
 
 
-def run_nn(sor_file, tar_file, val_src, val_tar, window=2):
+def run_nn(sor_file, tar_file, val_src, val_tar, window=2, val_on_dev=False):
     """
     Trains and validates training data.
     """
@@ -197,15 +197,10 @@ def run_nn(sor_file, tar_file, val_src, val_tar, window=2):
     batch_count = math.floor(batch.size / 200)
     batch_count_train = int(batch_count * 0.9)
     dataset.shuffle(int(batch_count * 1.1))
-    dataset_train = dataset.take(batch_count_train)  # training data
-    dataset_val = dataset.skip(batch_count_train)  # validation data
 
-    # run nn training with fit
-    history = train_by_fit(train_model, dataset_train, dataset_val)
-
-    # print the returned metrics from our method
-    # end of training
-    print(history.history)
+    if not val_on_dev:
+        dataset_train = dataset.take(batch_count_train)  # training data
+        dataset_val = dataset.skip(batch_count_train)  # validation data
 
     #### begin validation
     val_batch = get_all_batches(val_source, val_target, window)
@@ -224,9 +219,28 @@ def run_nn(sor_file, tar_file, val_src, val_tar, window=2):
         200, drop_remainder=True
     )
 
+    # run nn training with fit
+    history = train_by_fit(
+        train_model,
+        dataset if val_on_dev else dataset_train,
+        val_dataset if val_on_dev else dataset_val,
+        )
+
+    # save model
+    #train_model.save("model.h5")
+    #print("**** Saved model to disk (after training) ****")
+
+    # print the returned metrics from our method
+    # end of training
+    print(history.history)
+
     # evaluate results
     val_history = validate_by_evaluate(train_model, val_dataset)
     print(val_history)
+
+    save_name = f"model_val-loss-{val_history[0]:.3f}_val-acc-{val_history[1]:.3f}_val-per-{val_history[2]:.3f}"
+    train_model.save(save_name+".h5")
+    print("**** Saved model to disk (after eval) ****")
 
 def start_hp_search(tuner, dataset_train, dataset_val):
     """
@@ -397,6 +411,7 @@ def main():
             os.path.join(cur_dir, "output", sys.argv[4]),
             os.path.join(cur_dir, "output", sys.argv[5]),
             os.path.join(cur_dir, "output", sys.argv[6]),
+            val_on_dev=(sys.argv[11].lower()=='true'),
         )
 
 

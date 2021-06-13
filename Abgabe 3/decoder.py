@@ -128,7 +128,7 @@ def beam_decoder(test_model, source, target, k):
 
     #
     for i, (s, t) in enumerate(zip(source, target)):
-        if i == 10:
+        if i == 20:
             break
         batch = Batch()
         batch = create_batch(batch, s, t)

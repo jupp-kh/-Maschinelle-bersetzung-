@@ -20,7 +20,7 @@ params = dict(
     # prints training metrics every 50 batch as default
     reports="50",
     # checkpoint saving frequency
-    cp_freq="1000",
+    cp_freq="100000",
     # number of operations for subword split : BPE algorithm
     # default is set to 7000 operations
     oper="7000",
