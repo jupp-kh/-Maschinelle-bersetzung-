@@ -162,10 +162,50 @@ def beam_decoder(test_model, source, target, k):
             candidate_sentences = ordered[:k]
 
         create_text_files(candidate_sentences, k)
+        
 
+def calc_scores(test_model, source, target):
+    scores = []
+    t_1, t_2 = 0, 0
 
+    #
+    for i, (s, t) in enumerate(zip(source, target)):
+        score = 0
+        batch = Batch()
+        batch = create_batch(batch, s, t)
+        print(i)
+
+        pred_values = []
+        for iterator in range(len(batch.source)):
+            act_tar_label = batch.label[iterator]
+            dic = {
+                "I0": np.array([batch.source[iterator]]),
+                "I1": np.array([[t_1, t_2]]),
+            }
+            # prediction step
+            pred_values.append(test_model.predict(dic, batch_size=1, callbacks=None))
+
+            # swap values and get the best predictions
+            t_1 = t_2
+            t_2 = act_tar_label
+            score += math.log(get_value(tf.gather_nd(pred_values[iterator], indices=[act_tar_label]))[0])
+        scores.append(score)
+
+    dic_keys = dic_tar.get_keys()
+    target = map(lambda x: [dic_keys[i] for i in x], target)
+    scores = map(lambda x: math.exp(x), scores)
+    res = []
+    for (t, s) in zip(target, scores):
+        elem = target.append("-> Score: "+str(s))
+        res.append(elem)
+    
+    # save greedy search decoder data
+    ut.save_list_as_txt(
+        os.path.join(cur_dir, "a1_scores", "scores.de"),
+        res,
+    )
 #
-def loader(sor_file, tar_file, val_src, val_tar, window=2):
+def loader(sor_file, tar_file, val_src, val_tar, window=2, mode=b):
     """
     Load and test the model
     """
@@ -192,7 +232,9 @@ def loader(sor_file, tar_file, val_src, val_tar, window=2):
         ],
     )
 
-    beam_decoder(test_model, source, target, 3)
+    if mode == b: beam_decoder(test_model, source, target, 3)   # use beam search
+    if mode == g: greedy_decoder(test_model, source, target)    # use greedy search
+    if mode == s: calc_scores(test_model, source, target)        # calculate Score
 
 
 def main():
