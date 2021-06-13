@@ -292,7 +292,9 @@ def compare_bleu_scores(origin, *args):
     headers = ["File Name", "BLEU"]
     for tfile in args:
         # add name and score to table
-        table.append([get_path_leaf(tfile), met_bleu(origin, tfile, n=4)])
+        table.append(
+            [get_path_leaf(tfile), "{:0.4f}".format(met_bleu(origin, tfile, n=4))]
+        )
 
     # print table
     table = tabulate(table, headers=headers, tablefmt="orgtbl")
