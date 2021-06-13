@@ -1,6 +1,8 @@
 """
 
 """
+from metrics import compare_bleu_scores
+from encoder import rename_me
 from sys import exit
 from tensorflow.keras import Model
 from tensorflow.python.keras.backend import argmax
@@ -162,7 +164,7 @@ def beam_decoder(test_model, source, target, k):
             candidate_sentences = ordered[:k]
 
         create_text_files(candidate_sentences, k)
-        
+
 
 def calc_scores(test_model, source, target):
     scores = []
@@ -170,6 +172,8 @@ def calc_scores(test_model, source, target):
 
     #
     for i, (s, t) in enumerate(zip(source, target)):
+        if i == 10:
+            break
         score = 0
         batch = Batch()
         batch = create_batch(batch, s, t)
@@ -183,29 +187,32 @@ def calc_scores(test_model, source, target):
                 "I1": np.array([[t_1, t_2]]),
             }
             # prediction step
-            pred_values.append(test_model.predict(dic, batch_size=1, callbacks=None))
-
+            pred_values.append(test_model.predict(dic, batch_size=1, callbacks=None)[0])
+            # print(pred_values)
             # swap values and get the best predictions
             t_1 = t_2
             t_2 = act_tar_label
-            score += math.log(get_value(tf.gather_nd(pred_values[iterator], indices=[act_tar_label]))[0])
+            # print(pred_values[iterator])
+            score += math.log(get_value(pred_values[iterator][act_tar_label]))
         scores.append(score)
 
     dic_keys = dic_tar.get_keys()
-    target = map(lambda x: [dic_keys[i] for i in x], target)
-    scores = map(lambda x: math.exp(x), scores)
-    res = []
-    for (t, s) in zip(target, scores):
-        elem = target.append("-> Score: "+str(s))
-        res.append(elem)
-    
+    tmp = list(map(lambda x: [dic_keys[i] for i in x], target[:10]))
+
+    scores = list(map(lambda x: math.exp(x), scores))
+
+    for i in range(len(tmp)):
+        tmp[i].append(str(scores[i]))
+
     # save greedy search decoder data
     ut.save_list_as_txt(
         os.path.join(cur_dir, "a1_scores", "scores.de"),
-        res,
+        tmp,
     )
+
+
 #
-def loader(sor_file, tar_file, val_src, val_tar, window=2, mode=b):
+def loader(sor_file, tar_file, val_src, val_tar, window=2, mode="b"):
     """
     Load and test the model
     """
@@ -232,9 +239,12 @@ def loader(sor_file, tar_file, val_src, val_tar, window=2, mode=b):
         ],
     )
 
-    if mode == b: beam_decoder(test_model, source, target, 3)   # use beam search
-    if mode == g: greedy_decoder(test_model, source, target)    # use greedy search
-    if mode == s: calc_scores(test_model, source, target)        # calculate Score
+    if mode == "b":
+        beam_decoder(test_model, source, target, 3)  # use beam search
+    if mode == "g":
+        greedy_decoder(test_model, source, target)  # use greedy search
+    if mode == "s":
+        calc_scores(test_model, source, target)  # calculate Score
 
 
 def main():
@@ -242,12 +252,20 @@ def main():
     dic_src.get_stored(os.path.join(cur_dir, "dictionaries", "source_dictionary"))
     dic_tar.get_stored(os.path.join(cur_dir, "dictionaries", "target_dictionary"))
 
+    # z = [
+    #     os.path.join(os.curdir, "predictions", "beam_k=1_prediction" + str(i) + ".de")
+    #     for i in range(1)
+    # ]
+
+    # compare_bleu_scores(os.path.join(cur_dir, "data_exercise_3", "multi30k.dev.de"), z)
+
     # load model and predict outputs
     loader(
         os.path.join(cur_dir, "output", "multi30k_subword.en"),
         os.path.join(cur_dir, "output", "multi30k_subword.de"),
         os.path.join(cur_dir, "output", "multi30k.dev_subword.en"),
         os.path.join(cur_dir, "output", "multi30k.dev_subword.de"),
+        mode="s",
     )
 
 
