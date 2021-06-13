@@ -6,14 +6,14 @@ Contains metric class Perplexity
 * Contains network archictecture for word embedding: Modell
 """
 import tensorflow as tf
-import numpy as np
-from tensorflow.python.keras.engine import data_adapter
-import batches
 from tensorflow.keras.layers import Input, Concatenate, Embedding, Dense
 from tensorflow.keras.models import Model
 from dictionary import dic_tar, dic_src
 
 from tensorflow.python.ops.variables import trainable_variables
+
+# import config file for hyperparameter search space
+import config_custom_train as config
 
 
 # globals sit here
@@ -63,7 +63,7 @@ class Perplexity(tf.keras.metrics.Metric):
 
 
 # using this callback the perplexity gets updated properly
-class ExtCallback(tf.keras.callbacks.Callback):
+class MetricsCallback(tf.keras.callbacks.Callback):
     def __init__(self, display):
         self.seen = 0
         self.display = display
@@ -75,12 +75,61 @@ class ExtCallback(tf.keras.callbacks.Callback):
             outlog = logs
             outlog["perplexity"] = float(tf.exp(logs["loss"]).numpy())
             for key in outlog:
-                outlog[key] = "{:.2f}".format(outlog[key])
-            print("After", self.seen, "batches:", outlog)
+                outlog[key] = float("{:.3f}".format(outlog[key]))
+            print("After", self.seen, "batches", "(Batch "+str(batch)+" in Epoch):", outlog)
+
+    # call back seems to update perplexity at a better rate
+    def on_epoch_end(self, epoch, logs):
+        outlog = logs
+        outlog["perplexity"] = float(tf.exp(logs["loss"]).numpy())
+        print("\n"+"-"*80)
+        print("\tAfter Epoch", epoch+1, "we got the following loss and metrics:")
+        for key in outlog:
+            outlog[key] = float("{:.3f}".format(outlog[key]))
+            print("\t\t"+key+":\t",outlog[key])
+        print("-"*80+"\n")
 
 
 # class declaration
-class ExtModel(tf.keras.Model):
+class WordLabelerModel(Model):
+    # initialise model and build layers immediatly.
+    def __init__(self, window_size=2, **kwargs):
+        #     # building model
+        input_point_1 = Input(shape=(2 * window_size + 1,), name="I0")
+
+        x = Embedding(len(dic_src), 250, name="EmbeddedSource")(input_point_1)
+        x = Dense(units=200, activation="relu", name="FullyConSource")(x)
+
+        input_point_2 = Input(shape=(window_size,), name="I1")
+        y = Embedding(len(dic_tar), 250, name="EmbeddedTarget")(input_point_2)
+        y = Dense(units=200, activation="relu", name="FullyConTarget")(y)
+
+        fully_concat = Concatenate(axis=1, name="ConcatLayer")([x, y])
+
+        fully_connected_one = Dense(
+            200, activation="relu", name="FullyConnectedLayer1"
+        )(fully_concat)
+
+        # second fully connected layer / projection
+        fully_connected_two = Dense(
+            200, activation=None, name="FullyConnectedLayer2", input_shape=(len(dic_tar), 1)
+        )(fully_connected_one)
+
+        fully_connected_two = tf.keras.layers.Flatten(name="Flatten")(
+            fully_connected_two
+        )
+        # softmax layer
+        softmax_layer = Dense(len(dic_tar), activation="softmax", name="Softmax")(
+            fully_connected_two
+        )
+
+        # in1 = in_src.extend(in_tar)
+        # build model and specify input and output points.
+        # call super()
+        super(WordLabelerModel, self).__init__(
+            inputs=[input_point_1, input_point_2], outputs=[softmax_layer]
+        )
+
     def train_step(self, data):
         """
         Implements train_step from tf.keras.Model
@@ -117,6 +166,23 @@ class ExtModel(tf.keras.Model):
                 return_metrics[metric.name] = result
         return return_metrics
 
+    # compiles our defined word model
+    def compile_model(self):
+        """
+        compiles model
+        """
+        from tensorflow.keras.optimizers import Adam
+
+        self.compile(
+            optimizer=Adam(),
+            loss="categorical_crossentropy",
+            # using categorical cross entropy from keras provided one-hot vectors
+            metrics=[
+                "accuracy",
+                Perplexity(),
+            ],
+        )
+
     def test_step(self, data):
         # Unpack the data
         x, y = data
@@ -132,173 +198,156 @@ class ExtModel(tf.keras.Model):
         return {m.name: m.result() for m in self.metrics}
 
 
-class FeedForward:
+def build_search_model(hp):
     """
-    Class for our feed forward network
-    """
+        Method to pass to hyperparameter search of Keras Tuner Class to build the model
 
-    def __init__(self):
-        self.model = None
-
-    # the model
-    def build_model(self, w=2):
-        """
-        build our neural network model
-        """
-        # integrate_gpu()
-
-        input_point_1 = Input(shape=(2 * w + 1,), name="I0")
-
-        x = Embedding(len(dic_src), 200)(input_point_1)
-        x = Dense(units=200, activation="relu", name="FullyConSource")(x)
-
-        input_point_2 = Input(shape=(w,), name="I1")
-        y = Embedding(len(dic_tar), 200, name="EmbeddedTarget")(input_point_2)
-        y = Dense(units=200, activation="relu", name="FullyConTarget")(y)
-
-        fully_concat = Concatenate(axis=1, name="ConcatLayer")([x, y])
-
-        fully_connected_one = Dense(
-            200, activation="relu", name="FullyConnectedLayer1"
-        )(fully_concat)
-
-        # second fully connected layer / projection
-        fully_connected_two = Dense(
-            200, activation=None, input_shape=(len(dic_tar), 1)
-        )(fully_connected_one)
-
-        fully_connected_two = tf.keras.layers.Flatten(name="Flatten")(
-            fully_connected_two
-        )
-        # softmax layer
-        softmax_layer = Dense(len(dic_tar), activation="softmax", name="Softmax")(
-            fully_connected_two
-        )
-
-        # in1 = in_src.extend(in_tar)
-        # build final model
-        self.model = ExtModel(
-            inputs=[input_point_1, input_point_2], outputs=[softmax_layer]
-        )
-
-    def compile_model(self):
-        """
-        compiles model
-        """
-        from tensorflow.keras.optimizers import Adam
-
-        self.model.compile(
-            optimizer=Adam(),
-            loss="categorical_crossentropy",
-            # using categorical cross entropy from keras provided one-hot vectors
-            metrics=[
-                "accuracy",
-                Perplexity(),
-            ],
-        )
-
-    def show_summary(self):
-        print(self.model.summary())
-
-
-######### Another prototype model #########
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#
-#   Prototype might be unnecessary
-#   Could use ExtModel instead
-#   add build and compile to it and
-#   create its python file
-#
-#
-#
-#
-#
-#
-#
-#
-# implements architecture differently
-
-
-class Prototype:
-    """
-    Class for our feed forward network
+        @param hp: hyperparameters
+        @return model: Tensorflow model
     """
 
-    def __init__(self):
-        self.model = None
+    output_dim_emp = hp.Int(config.hp_space['output_dim_emb']['name'],
+                                        min_value=config.hp_space['output_dim_emb']['min_value'],
+                                        max_value=config.hp_space['output_dim_emb']['max_value'],
+                                        step=config.hp_space['output_dim_emb']['step'])
+    units_fullcon = hp.Int(config.hp_space['units_fullcon']['name'],
+                                        min_value=config.hp_space['units_fullcon']['min_value'],
+                                        max_value=config.hp_space['units_fullcon']['max_value'],
+                                        step=config.hp_space['units_fullcon']['step'])
 
-    # the model
-    def build_model(self, w=2):
-        """
-        build our neural network model
-        """
+    input_point_1 = Input(shape=(2 * config.hp_space['w'] + 1,), name="I0")
+    x = Embedding(
+        len(dic_src),
+        output_dim=output_dim_emp,
+        name="EmbeddedSource")(input_point_1)
+    x = Dense(
+        units=units_fullcon,
+        activation=hp.Choice(config.hp_space['activation_functions']['name'], values=config.hp_space['activation_functions']['functions']),
+        name="FullyConSource")(x)
 
-        in_src = []
-        out_src = []
-        for i in range(2 * w + 1):
-            in_src.append(Input(shape=(len(dic_src),), name="I" + str(i)))
-            out_src.append(
-                Embedding(len(dic_src), 10, input_length=len(dic_src))(in_src[i])
-            )
-        fully_con_src = Concatenate()(out_src)
+    input_point_2 = Input(shape=(config.hp_space['w'],), name="I1")
+    y = Embedding(
+        len(dic_tar),
+        output_dim=output_dim_emp,
+        name="EmbeddedTarget")(input_point_2)
+    y = Dense(
+        units=units_fullcon,
+        activation=hp.Choice(config.hp_space['activation_functions']['name'], values=config.hp_space['activation_functions']['functions']),
+        name="FullyConTarget")(y)
 
-        # output of fully connected layer
-        out_dense_src = Dense(100, activation="relu")(fully_con_src)
+    fully_concat = Concatenate(axis=1, name="ConcatLayer")([x, y])
 
-        in_tar = []
-        out_tar = []
+    fully_connected_one = Dense(
+        units=hp.Int(config.hp_space['units_fullcon_1']['name'],
+                                        min_value=config.hp_space['units_fullcon_1']['min_value'],
+                                        max_value=config.hp_space['units_fullcon_1']['max_value'],
+                                        step=config.hp_space['units_fullcon_1']['step']),
+        activation=hp.Choice(config.hp_space['activation_functions']['name'], values=config.hp_space['activation_functions']['functions']),
+        name="FullyConnectedLayer1"
+    )(fully_concat)
 
-        for i in range(w):
-            in_tar.append(Input(shape=(len(dic_tar),), name="I" + str(2 * w + 1 + i)))
-            out_tar.append(
-                Embedding(len(dic_tar), 10, input_length=len(dic_tar))(in_tar[i])
-            )
+    # second fully connected layer / projection
+    fully_connected_two = Dense(
+        units=hp.Int(config.hp_space['units_fullcon_2']['name'],
+                                        min_value=config.hp_space['units_fullcon_2']['min_value'],
+                                        max_value=config.hp_space['units_fullcon_2']['max_value'],
+                                        step=config.hp_space['units_fullcon_2']['step']),
+        activation=None,
+        name="FullyConnectedLayer2",
+        input_shape=(len(dic_tar), 1)
+    )(fully_connected_one)
 
-        fully_con_tar = Concatenate()(out_tar)
-        # output of fully connected layer
-        out_dense_tar = Dense(100, activation="relu")(fully_con_tar)
+    fully_connected_two = tf.keras.layers.Flatten(name="Flatten")(
+        fully_connected_two
+    )
+    # softmax layer
+    softmax_layer = Dense(len(dic_tar), activation="softmax", name="Softmax")(
+        fully_connected_two
+    )
 
-        # concatenate output from src and tar in concat layer
-        dense_concat = Concatenate(axis=1)([out_dense_src, out_dense_tar])
+    # build model and specify input and output points.
+    model = Model(inputs=[input_point_1, input_point_2], outputs=[softmax_layer])
 
-        # fully connected layer 1
-        fully_connected_one = Dense(100, activation="relu")(dense_concat)
+    # compile model with optimizer, loss and metrics
+    print("--- Model ready to compile")
+    from tensorflow.keras.optimizers import Adam
+    model.compile(
+        optimizer=Adam(
+            hp.Choice(config.hp_space['learning_rates']['name'], values=config.hp_space['learning_rates']['lrs'])
+        ),
+        loss="sparse_categorical_crossentropy",
+        metrics=[
+            "accuracy",
+            #Perplexity(),
+        ],
+    )
+    print("--- Model compiled")
+    return model
 
-        # second fully connected layer / projection
-        fully_connected_two = Dense(
-            100, activation=None, input_shape=(len(dic_tar), 1)
-        )(fully_connected_one)
+# class FeedForward:
+#     """
+#     Class for our feed forward network
+#     """
 
-        # softmax layer
-        softmax_layer = Dense(1, activation="softmax", name="O")(fully_connected_two)
+#     def __init__(self):
+#         self.model = None
 
-        # in1 = in_src.extend(in_tar)
-        # build final model
-        self.model = Model(inputs=[in_src + in_tar], outputs=[softmax_layer])
+#     # the model
+#     def build_model(self, w=2):
+#         """
+#         build our neural network model
+#         """
+#         # integrate_gpu()
 
-    def compile_model(self):
-        """
-        compiles model
-        """
-        from tensorflow.keras.optimizers import SGD
+#         input_point_1 = Input(shape=(2 * w + 1,), name="I0")
 
-        self.model.compile(
-            optimizer=SGD(lr=0.01),
-            loss="mse",
-            # using categorical cross entropy from keras provided one-hot vectors
-            metrics=[
-                "accuracy",
-            ],
-        )
+#         x = Embedding(len(dic_src), 250)(input_point_1)
+#         x = Dense(units=200, activation="relu", name="FullyConSource")(x)
 
-    def show_summary(self):
-        print(self.model.summary())
+#         input_point_2 = Input(shape=(w,), name="I1")
+#         y = Embedding(len(dic_tar), 250, name="EmbeddedTarget")(input_point_2)
+#         y = Dense(units=200, activation="relu", name="FullyConTarget")(y)
+
+#         fully_concat = Concatenate(axis=1, name="ConcatLayer")([x, y])
+
+#         fully_connected_one = Dense(
+#             200, activation="relu", name="FullyConnectedLayer1"
+#         )(fully_concat)
+
+#         # second fully connected layer / projection
+#         fully_connected_two = Dense(
+#             200, activation=None, input_shape=(len(dic_tar), 1)
+#         )(fully_connected_one)
+
+#         fully_connected_two = tf.keras.layers.Flatten(name="Flatten")(
+#             fully_connected_two
+#         )
+#         # softmax layer
+#         softmax_layer = Dense(len(dic_tar), activation="softmax", name="Softmax")(
+#             fully_connected_two
+#         )
+
+#         # in1 = in_src.extend(in_tar)
+#         # build final model
+#         self.model = ExtModel(
+#             inputs=[input_point_1, input_point_2], outputs=[softmax_layer]
+#         )
+
+#     def compile_model(self):
+#         """
+#         compiles model
+#         """
+#         from tensorflow.keras.optimizers import Adam
+
+#         self.model.compile(
+#             optimizer=Adam(),
+#             loss="categorical_crossentropy",
+#             # using categorical cross entropy from keras provided one-hot vectors
+#             metrics=[
+#                 "accuracy",
+#                 Perplexity(),
+#             ],
+#         )
+
+#     def show_summary(self):
+#         print(self.model.summary())

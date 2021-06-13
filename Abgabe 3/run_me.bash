@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 
 ########## parameters ##########
 
@@ -16,13 +16,13 @@ oper="7000"
 ### currently: targen: en, source:de ###
 # text file to train the model on 
 # should exist in data_exercise_3
-source_train_file="multi30k.de"
-target_train_file="multi30k.en"
+source_train_file="multi30k_subword.en"
+target_train_file="multi30k_subword.de"
 
 # text file to validate trained model on
 # should also exist in data_exercise_3  
-source_val_file="multi30k.dev.de"
-target_val_file="multi30k.dev.en"
+source_val_file="multi30k.dev_subword.en"
+target_val_file="multi30k.dev_subword.de"
 
 ## saving and loading models
 # checkpoints can also be specified 
@@ -33,21 +33,25 @@ target_val_file="multi30k.dev.en"
 fractional_lr="False"
 
 ## print tensorboard
-tb="False"
+tb="True"
 
+## start hyperparametersearch
+hps="False"
 
+## use gpu
+gpu="False"
 
+## use dev as validation data during training/hyperparametersearch (right now just possible in hp search)
+val_on_dev="False"
 
 #######    Now we call test_nn with the specified parameters     #######
 if [ ! -z $1 ]
 then 
-    if [ $1 = "--go" ] 
+    if [ $1 = "--go" ]
     then 
-        args="${reports} ${oper} ${source_train_file} 
-            ${target_train_file} ${source_val_file} ${cp_freq}
-            ${target_val_file} ${fractional_lr} ${tb}"
+        args="${reports} ${oper} ${source_train_file} ${target_train_file} ${source_val_file} ${target_val_file} ${cp_freq} ${fractional_lr} ${tb} ${hps} ${gpu} ${val_on_dev}"
 
-        python3 test_nn.py args 
+        python3 test_nn.py ${args} 
         exit
     else 
         echo "Error " $1 " is not a valid argument"

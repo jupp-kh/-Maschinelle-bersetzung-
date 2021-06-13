@@ -189,6 +189,8 @@ def revert_bpe(file):
 
     # write original text back out > file
     with open(file, "w", encoding="utf-8") as write_f:
+        reader = reader.replace("<s> ", "")
+        reader = reader.replace("</s>", "")
         write_f.write(reader.replace("@@ ", ""))
 
 
@@ -216,4 +218,15 @@ def run_bpe(*oper):
     # revert_bpe("Abgabe 2/data_exercise_2/multi30k.de100")
 
 
-run_bpe(7000)
+def rename_me():
+    for i in range(5):
+        revert_bpe(
+            os.path.join(
+                os.curdir, "predictions", "beam_k=10_prediction" + str(i) + ".de"
+            )
+        )
+    # run_bpe(7000)
+
+
+if __name__ == "__main__":
+    rename_me()
