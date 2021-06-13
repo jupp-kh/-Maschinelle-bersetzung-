@@ -7,7 +7,7 @@
 |Einführung und Metriken|26.04|2e6ca3e0|:heavy_check_mark:|
 |Vokabular und Subword Units|10.05|03e07168908f743b9b72da835122fcd4ef25f26d|:heavy_check_mark:|
 |Feed Forward Netzwerke|31.05|17e7dd51f2253cb3a2d152ed8534fad1263850f3|:heavy_check_mark:|
-|Suche|14.06|-|-|
+|Suche|14.06|0b7d0973a88b8e8c1832ab953df24a28ef6ac825|-|
 |Rekurrente Neuronale Netzwerke|-|-|-|
 |Blatt 6|-|-|-|
 
