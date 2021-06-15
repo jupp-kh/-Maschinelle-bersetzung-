@@ -1,0 +1,16 @@
+version: '3.7'
+
+# this file ensures an image is created from the Dockerfile
+# the defined ci-series service creates a container from the 
+#   given image we specify for the runner.
+
+services:
+  ci-series:
+    build: .
+    command: ["python", "./Abgabe 3/main.py"]
+    environment:
+      PYTHONUNBUFFERED: 1
+    image: ${COMPOSE_TAG:-ci-series-local}
+    volumes:
+      - '.:/usr/src/gitlab-ci-series/'
+    working_dir: /usr/src/gitlab-ci-series

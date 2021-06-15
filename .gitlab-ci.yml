@@ -1,0 +1,45 @@
+# Environment variable readme
+# https://docs.gitlab.com/ee/ci/variables/
+
+# Predefined environment variables
+# https://docs.gitlab.com/ee/ci/variables/predefined_variables.html
+
+# Using docker images
+# https://docs.gitlab.com/ee/ci/docker/using_docker_images.html
+
+# .gitlab-ci.yml reference
+# https://docs.gitlab.com/ee/ci/yaml/
+
+# Container registry reference (authenticating, etc.)
+# https://gitlab.com/help/user/packages/container_registry/index
+
+#### Note: Place this file in root folder of git repository 
+
+stages:
+  - build
+  - test
+  - deploy
+
+
+
+docker-development-test:
+  # Job that handles both building and testing in a single stage. This is used to test commits against
+  # all branches except master. This job combines building and testing in order to save time.
+  # Since no pushing/pulling of images is needed, no variables are defined. docker-compose.yml is setup
+  # to use a default value for the image tag when COMPOSE_TAG is not defined in the current environment.
+
+  except:
+    - master
+
+  image: tmaier/docker-compose
+
+  services:
+    - docker:dind
+
+  stage: test
+
+  before_script:
+    - docker-compose build --no-cache
+
+  script:
+    - docker-compose run ci-series python -m unittest discover -s ./tests
