@@ -74,6 +74,7 @@ def beam_decoder_outdated(data, k):
 
 
 def create_text_files(line, k):
+    """Used with beam decoder to store the created lines from predictions. """
     sentence = [[] for _ in range(k)]
     keys_list = dic_tar.get_keys()
     for i in range(k):
@@ -86,6 +87,7 @@ def create_text_files(line, k):
 
 
 def greedy_decoder(test_model, source, target):
+    """searches through the output of predict using greedy search"""
     history = []
     greedy_values = []
     t_1, t_2 = 0, 0
@@ -127,6 +129,7 @@ def greedy_decoder(test_model, source, target):
 
 
 def beam_decoder(test_model, source, target, k):
+    """searches through the output of predict using beam search"""
     t_1, t_2 = 0, 0
 
     #
