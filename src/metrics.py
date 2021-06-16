@@ -245,6 +245,19 @@ def value_counter():
         )
 
 
+def get_word_len_avr(f_name):
+    """given a file get average number of words in each line"""
+    cmd = "wc " + f_name + " | awk '{print $2/$1}'"
+    cmd = subprocess.Popen(
+        cmd,
+        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        universal_newlines=True,
+    )
+    return float(cmd.communicate()[0][:-2].replace(",", "."))
+
+
 def main():
     """main() method"""
     # calculate first assignment
