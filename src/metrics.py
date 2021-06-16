@@ -1,18 +1,18 @@
 # code uses PEP8 naming conventions
 import sys
 import math
-import os
 import subprocess
-from math import pi
-import utility as ut
 from tabulate import tabulate
 import ntpath
+import utility as ut
 
 # TODO REQ Beim Levenstein-Distanz fehlt noch auszugeben, welche Einfügungen,
 # Auslassungen und Ersetzungen der Programm in einem beliebig wählbaren Satz
 # vorgenommen hat, um eine minimale Distanz zu erhalten.
 # function to compute the levenshtein distance
 def levenshtein_distance(string1, string2, output):
+    """returns the levenstein distance"""
+
     str1 = string1.split(" ")
     str2 = string2.split(" ")
     # initialise matrix structure
@@ -78,6 +78,7 @@ def levenshtein_distance(string1, string2, output):
 
 # return the number of n grams
 def num_n_grams(reference, hypothesis):
+    """return the number of n grams"""
     # split reference at n_gram occurrence
     ref = (" " + reference + " ").split(" " + hypothesis + " ")
     return len(ref) - 1
@@ -97,6 +98,7 @@ def removeduplicate(lis):
 # helps calculate the numerator (zaehler) and denominator (nenner) for the bleu metric
 # returns the tuple (numerator, denominator)
 def bleu_num_denom(reference, hypothesis, n):
+    """helps calculate the numerator (zaehler) and denominator (nenner) for the bleu metric"""
     hypo_word = hypothesis.split()
     n_gram_list = []
     sum_numerator = 0
@@ -120,6 +122,7 @@ def bleu_num_denom(reference, hypothesis, n):
 
 # function to calculate the modified n-gram precision
 def precision(reference, hypothese, n):
+    """calculates the modified n-gram precision"""
     if len(reference) != len(hypothese):
         raise Exception("Error: hypothesis and reference files have different lengths!")
     numerator = 0
@@ -136,6 +139,7 @@ def precision(reference, hypothese, n):
 
 # this function calculates the brevity penalty
 def brevity_penalty(referenz, hypothese):
+    """calculates the brevity penalty"""
     if len(hypothese) > len(referenz):
         return 1
     else:
@@ -146,6 +150,7 @@ def brevity_penalty(referenz, hypothese):
 # Bilingual Evaluation Study
 # Basic idea: How many blocks are identical in reference and hypothesis?
 def met_bleu(datei1, datei2, n):
+    """computes the bleu metric"""
     referenz = ut.read_from_file(datei1)
     hypothese = ut.read_from_file(datei2)
     res = 0
@@ -166,6 +171,7 @@ def met_bleu(datei1, datei2, n):
 
 # function to compute the Word-Error-Rate aka WER
 def met_wer(datei1, datei2):
+    """compute the Word-Error-Rate aka WER"""
     referenz = ut.read_from_file(datei1)
     hypothese = ut.read_from_file(datei2)
     sum_leven_d = 0
@@ -179,6 +185,7 @@ def met_wer(datei1, datei2):
 
 # function to compute the Position-independent Error Rate aka PER
 def met_per(datei1, datei2):
+    """compute the Position-independent Error Rate"""
     referenz = "".join(ut.read_from_file(datei1)).split()
     hypothese = "".join(ut.read_from_file(datei2)).split()
     words = removeduplicate(referenz)
@@ -193,6 +200,7 @@ def met_per(datei1, datei2):
 
 
 def value_counter():
+    """uses bash lines to get values from files"""
     # Berechnen Sie folgende Korpus-Statistiken für Quell- und Zielseite der Testdaten
     # (Dateien newstest.de und newstest.en): Anzahl der laufenden Wörter, Anzahl verschiedener
     # Wörter, durchschnittliche Satzlänge. Setzen Sie dazu Unix-Tools wie sed und wc ein.
@@ -238,6 +246,7 @@ def value_counter():
 
 
 def main():
+    """main() method"""
     # calculate first assignment
     value_counter()
     # calculate levenstein distance
