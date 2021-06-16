@@ -2,18 +2,16 @@
 Automated test file for decoder.py
 """
 
+import os
 import unittest
-import sys
-
-sys.path.insert(0, "..")
-# import src.decoder as decoder
-from pylint.lint import Run
 
 
 class TestDecoder(unittest.TestCase):
+    """implements unittest.TestCase"""
+
     def test_code_integrity(self):
         """uses pylint to view code's quality"""
-        Run(["--errors-only", "./../src/decoder.py"])
+        os.system("pylint src/decoder.py")
 
 
 if __name__ == "__main__":

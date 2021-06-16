@@ -1,17 +1,19 @@
 """
-
+not empty
 """
 # from metrics import compare_bleu_scores
 # from encoder import rename_me
-from sys import exit
-from tensorflow.keras import Model
-from tensorflow.python.keras.backend import argmax
-from batches import *
+import math
+import os
+from tensorflow.keras.backend import argmax
 from tensorflow.keras.backend import get_value
 import tensorflow as tf
 import numpy as np
+from batches import *
 import utility as ut
 import custom_model
+from dictionary import dic_tar, dic_src
+from utility import cur_dir
 
 
 def greedy_decoder_outdated(arr):
@@ -228,7 +230,7 @@ def loader(model, val_src, val_tar, window=2, mode="b"):
 
     test_model = custom_model.WordLabelerModel()
     test_model.load_weights(
-        "training_1/train_model.epoch11-loss0.50.hdf5",
+        model,
     )
     print(test_model.summary())
     test_model.compile(
