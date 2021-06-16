@@ -1,4 +1,5 @@
 import csv
+from metrics import get_word_len_avr
 import os
 import utility as ut
 from utility import cur_dir
@@ -74,6 +75,28 @@ def alignment(sor_len, tar_len):
     # etc...
     op = lambda x: math.floor(x * (sor_len / tar_len))
     return op
+
+
+def get_pred_batch(line, dev=0, window=2):
+    """method creates a batch structure using only the line and its length"""
+    # line is from the source file
+    # create source window 2*window+1 and extend it using the alignment.
+    # get firstly line deviation if not given
+    if dev == 0:
+        c_en, c_de = 0, 0
+        dev_en = 0
+        for f in os.listdir("./train_data"):
+            if f.endswith(".de"):
+                dev += get_word_len_avr("./train_data/" + f)
+                c_de += 1
+            if f.endswith(".en"):
+                dev_en += get_word_len_avr("./train_data/" + f)
+                c_en += 1
+        # calculate deviaton
+        dev = (dev_en / c_en) / (dev / c_de)
+    print(round(dev * len(line)), (dev * len(line)))
+    art_tar = [0 for _ in range(round(dev * len(line)))]
+    return art_tar
 
 
 def save_batch_as_int(batch):
