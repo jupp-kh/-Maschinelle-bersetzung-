@@ -1,8 +1,11 @@
 """
 
 """
+"""
+
+"""
 from metrics import compare_bleu_scores
-from encoder import rename_me
+from encoder import rename_me, revert_bpe
 from sys import exit
 from tensorflow.keras import Model
 from tensorflow.python.keras.backend import argmax
@@ -15,7 +18,7 @@ import utility as ut
 
 
 def greedy_decoder_outdated(arr):
-    """ Implements the greedy decoder search algorithm """
+    """Implements the greedy decoder search algorithm"""
     tmp = []
     keys_list = dic_tar.get_keys()
 
@@ -127,11 +130,9 @@ def greedy_decoder(test_model, source, target):
 
 def beam_decoder(test_model, source, target, k):
     t_1, t_2 = 0, 0
-
+    file_txt = []
     #
     for i, (s, t) in enumerate(zip(source, target)):
-        if i == 20:
-            break
         batch = Batch()
         batch = create_batch(batch, s, t)
         candidate_sentences = [[[0], 0.0]]
@@ -162,8 +163,28 @@ def beam_decoder(test_model, source, target, k):
                     all_candidates.append(candidate)
             ordered = sorted(all_candidates, key=lambda tup: tup[1])
             candidate_sentences = ordered[:k]
+        file_txt.append(candidate_sentences)
 
-        create_text_files(candidate_sentences, k)
+    save_k_txt(file_txt, k)
+
+
+def save_k_txt(file_txt, k):
+    keys_list = dic_tar.get_keys()
+    txt_list = [[] for _ in range(k)]
+    for elem in file_txt:
+        sentence = [[] for _ in range(k)]
+        for i in range(k):
+            str_lines = map(lambda x: keys_list[x], elem[i][0])
+            sentence = list(str_lines)
+            txt_list[i].append(sentence)
+    for i in range(k):
+        ut.save_list_as_txt(
+            os.path.join(cur_dir, "predictions1", "beam_prediction1" + str(i) + ".en"),
+            txt_list[i],
+        )
+        revert_bpe(
+            os.path.join(cur_dir, "predictions", "beam_prediction1" + str(i) + ".en")
+        )
 
 
 def calc_scores(test_model, source, target):
@@ -261,10 +282,10 @@ def main():
 
     # load model and predict outputs
     loader(
-        os.path.join(cur_dir, "output", "multi30k_subword.en"),
         os.path.join(cur_dir, "output", "multi30k_subword.de"),
-        os.path.join(cur_dir, "output", "multi30k.dev_subword.en"),
+        os.path.join(cur_dir, "output", "multi30k_subword.en"),
         os.path.join(cur_dir, "output", "multi30k.dev_subword.de"),
+        os.path.join(cur_dir, "output", "multi30k.dev_subword.en"),
         mode="s",
     )
 
