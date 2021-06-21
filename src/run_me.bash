@@ -16,13 +16,13 @@ oper="7000"
 ### currently: targen: en, source:de ###
 # text file to train the model on 
 # should exist in data_exercise_3
-source_train_file="multi30k_subword.en"
-target_train_file="multi30k_subword.de"
+source_train_file="multi30k_subword.de"
+target_train_file="multi30k_subword.en"
 
 # text file to validate trained model on
 # should also exist in data_exercise_3  
-source_val_file="multi30k.dev_subword.en"
-target_val_file="multi30k.dev_subword.de"
+source_val_file="multi30k.dev_subword.de"
+target_val_file="multi30k.dev_subword.en"
 
 ## saving and loading models
 # checkpoints can also be specified 

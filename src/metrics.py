@@ -1,10 +1,15 @@
 # code uses PEP8 naming conventions
+import os
 import sys
 import math
 import subprocess
 from tabulate import tabulate
 import ntpath
-import utility as ut
+
+try:  # keep this for metrics test
+    import utility as ut
+except:
+    pass
 
 # TODO REQ Beim Levenstein-Distanz fehlt noch auszugeben, welche Einfügungen,
 # Auslassungen und Ersetzungen der Programm in einem beliebig wählbaren Satz
@@ -151,8 +156,9 @@ def brevity_penalty(referenz, hypothese):
 # Basic idea: How many blocks are identical in reference and hypothesis?
 def met_bleu(datei1, datei2, n):
     """computes the bleu metric"""
-    referenz = ut.read_from_file(datei1)
-    hypothese = ut.read_from_file(datei2)
+    # NOTE! keep the else part for ci tester
+    referenz = ut.read_from_file(datei1) if os.path.isfile(datei1[0]) else datei1
+    hypothese = ut.read_from_file(datei2) if os.path.isfile(datei2[0]) else datei2
     res = 0
 
     # calculate the precision
