@@ -1,23 +1,26 @@
 """
-not empty
+decoder.py offers methods that compute beam search and greedy search which help find
+bettter translations from trained language models.
 """
 import itertools
-from pstats import SortKey
-from metrics import compare_bleu_scores
-
-from encoder import revert_bpe
 import math
 import os
+import multiprocessing
+import tensorflow as tf
 from tensorflow.keras.backend import argmax
 from tensorflow.keras.backend import get_value
-import tensorflow as tf
 import numpy as np
-from batches import *
+from encoder import revert_bpe
+from batches import (
+    Batch,
+    get_pred_batch,
+    create_batch,  # TODO remove later
+    get_word_index,  # TODO remove later
+)
 import utility as ut
 import custom_model as cm
 from dictionary import dic_tar, dic_src
 from utility import cur_dir
-import multiprocessing
 
 
 def get_model(model):
@@ -60,7 +63,7 @@ def greedy_decoder(test_model, source, target):
     t_1, t_2 = 0, 0
 
     #
-    for i, (s, t) in enumerate(zip(source, target)):
+    for _, (s, t) in enumerate(zip(source, target)):
         batch = create_batch(Batch(), s, t)
 
         pred_values, tmp_greed = [], []
@@ -94,21 +97,19 @@ def greedy_decoder(test_model, source, target):
     return path
 
 
-def inner_beam(test_model, i, s, t, k):
+def inner_beam(test_model, i, source, k):
+    """used by beam search to process lines simultaneously"""
     # nonlocal file_txt, test_model
     t_1, t_2 = 0, 0
     # i, (s, t) in enumerate(zip(source, target)):
 
-    if i == 10:
-        return
-    batch = Batch()
-    batch = create_batch(batch, s, t)
+    batch = get_pred_batch(source)
     candidate_sentences = [[[0], 0.0]]
     pred_values = []
     test_model = get_model(test_model)
     for iterator in range(len(batch.source)):
         all_candidates = []
-        for j in range(len(candidate_sentences)):
+        for j, _ in enumerate(candidate_sentences):
             # get last element to compute next prediction
             t_2 = candidate_sentences[j][0][-1]
             # print(t_2)
@@ -123,10 +124,10 @@ def inner_beam(test_model, i, s, t, k):
             t_1 = t_2
             k_best = tf.math.top_k(pred_values, k=k)
             seq, score = candidate_sentences[j]
-            for l in range(len(k_best)):
+            for x in enumerate(k_best):
                 candidate = [
-                    seq + [get_value(k_best.indices[l])],
-                    score - math.log(get_value(k_best.values[l])),
+                    seq + [get_value(k_best.indices[x])],
+                    score - math.log(get_value(k_best.values[x])),
                 ]
                 all_candidates.append(candidate)
         ordered = sorted(all_candidates, key=lambda tup: tup[1])
@@ -134,30 +135,33 @@ def inner_beam(test_model, i, s, t, k):
     return candidate_sentences
 
 
-def beam_decoder(test_model, source, target, k):
+def beam_decoder(test_model, source, k):
+    """finds the best translation scores using the beam decoder."""
     file_txt = []
 
     # open pool for multiprocessing library
-    with multiprocessing.Pool(processes=8) as p:
+    with multiprocessing.Pool(processes=8) as pool:
         # multiprocessing lines
-        file_txt = p.starmap(
+        file_txt = pool.starmap(
             inner_beam,
             zip(
                 itertools.repeat(test_model),
                 range(10),
                 source[:10],
-                target[:10],
                 itertools.repeat(k),
             ),
         )
-    p.close()
-    p.join()
-    for e in file_txt:
-        print(e)
+    # ensure the pipe is closed and wait for all
+    # processes to finish their work
+    pool.close()
+    pool.join()
+
+    # save the predicted outputs
     save_k_txt(file_txt, k)
 
 
 def save_k_txt(file_txt, k):
+    """provided an integer k and encoded text saves beam predictions into file system"""
     keys_list = dic_tar.get_keys()
     txt_list = [[] for _ in range(k)]
     for elem in file_txt:
@@ -185,6 +189,7 @@ def save_k_txt(file_txt, k):
 
 
 def calc_scores(test_model, source, target):
+    """scores a target translation based on the trained model"""
     test_model = get_model(test_model)
     scores = []
     t_1, t_2 = 0, 0
@@ -196,7 +201,7 @@ def calc_scores(test_model, source, target):
         score = 0
         batch = Batch()
         batch = create_batch(batch, s, t)
-        print(i)
+        # print(i)
 
         pred_values = []
         for iterator in range(len(batch.source)):
@@ -220,7 +225,7 @@ def calc_scores(test_model, source, target):
 
     scores = list(map(lambda x: math.exp(x), scores))
 
-    for i in range(len(tmp)):
+    for i, _ in enumerate(tmp):
         tmp[i].append(str(scores[i]))
 
     # save greedy search decoder data
@@ -228,9 +233,10 @@ def calc_scores(test_model, source, target):
         os.path.join(cur_dir, "a1_scores", "scores.de"),
         tmp,
     )
+    return 0
 
 
-#
+# TODO make use of window variable
 def loader(model, val_src, val_tar, window=2, mode="b"):
     """
     Load and test the model
@@ -242,14 +248,16 @@ def loader(model, val_src, val_tar, window=2, mode="b"):
     # batch = get_all_batches(source, target, window)
 
     if mode == "b":
-        return beam_decoder(model, source, target, 3)  # use beam search
+        return beam_decoder(model, source, 3)  # use beam search
     if mode == "g":
-        return greedy_decoder(model, source, target)  # use greedy search
+        return beam_decoder(model, source, 1)  # use greedy search
     if mode == "s":
         return calc_scores(model, source, target)  # calculate Score
+    return 0
 
 
 def main():
+    """main method"""
     # read learned dictionaries for source and target
     dic_src.get_stored(os.path.join(cur_dir, "dictionaries", "source_dictionary"))
     dic_tar.get_stored(os.path.join(cur_dir, "dictionaries", "target_dictionary"))
