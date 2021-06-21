@@ -16,12 +16,13 @@ import datetime
 import numpy as np
 import tensorflow as tf
 from tensorflow.python.keras.backend import _LOCAL_DEVICES
+from kerastuner.tuners import RandomSearch
 import batches
 from batches import Batch, get_all_batches
 import utility as ut
-from encoder import run_bpe
-from dictionary import dic_src, dic_tar
-from kerastuner.tuners import RandomSearch
+
+# from encoder import run_bpe
+# from dictionary import dic_src, dic_tar
 import config_custom_train as config
 
 # remove us
@@ -218,7 +219,6 @@ def run_nn(sor_file, tar_file, val_src, val_tar, window=2, val_on_dev=False):
     val_batch = get_all_batches(val_source, val_target, window)
     val_feed_src = np.array(val_batch.source)
     val_feed_tar = np.array(val_batch.target)
-    val_output_tar = []
     val_output_tar = np.array(val_batch.label)
 
     ## dictionary to specify inputs at each input point in NN
@@ -433,12 +433,14 @@ def main():
         )
 
 
-def l():
+def outdated_tester():
+    """used to test"""
     path = os.path.join(cur_dir, "training_1")
     dev_1 = os.path.join(cur_dir, "output", sys.argv[5])
     dev_2 = os.path.join(cur_dir, "output", sys.argv[6])
     max_file = max(glob.glob(path + "/*hdf5"), key=os.path.getctime)
     data_path = decoder.loader(max_file, dev_1, dev_2, mode="g")
+    print(data_path)
 
 
 if __name__ == "__main__":

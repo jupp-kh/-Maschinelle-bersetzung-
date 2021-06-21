@@ -1,8 +1,11 @@
 """
 not empty
 """
-# from metrics import compare_bleu_scores
-# from encoder import rename_me
+import itertools
+from pstats import SortKey
+from metrics import compare_bleu_scores
+
+from encoder import revert_bpe
 import math
 import os
 from tensorflow.keras.backend import argmax
@@ -11,68 +14,30 @@ import tensorflow as tf
 import numpy as np
 from batches import *
 import utility as ut
-import custom_model
+import custom_model as cm
 from dictionary import dic_tar, dic_src
 from utility import cur_dir
+import multiprocessing
 
 
-def greedy_decoder_outdated(arr):
-    """ Implements the greedy decoder search algorithm """
-    tmp = []
-    keys_list = dic_tar.get_keys()
-
-    result = []
-    for elem in arr:
-        biggest = tf.keras.backend.get_value(argmax(elem))
-        tmp.append(keys_list[biggest])
-        if biggest == dic_tar.bi_dict["."] and tmp != []:
-            result.append(tmp)
-            tmp = []
-
-    return result
-
-
-def beam_decoder_outdated(data, k):
-    """
-    Implements the beam search decoding algorithm
-    Returns k lists with best possible predictions
-    """
-
-    # avrg line length
-    # wc -lw data_exercise_3/multi30k.de | awk '{print $2/$1}'
-
-    sequences = [[list(), 0.0]]
-    for elem in data:
-        all_candidates = list()
-        k_candidates = tf.math.top_k(elem, k=k)
-        for i in range(len(sequences)):
-            seq, score = sequences[i]
-            for j in range(len(k_candidates)):
-                candidate = [
-                    seq + [get_value(k_candidates.indices[j])],
-                    score - math.log(get_value(k_candidates.values[j])),
-                ]
-                all_candidates.append(candidate)
-        # order all candidates by score
-
-        ordered = sorted(all_candidates, key=lambda tup: tup[1])
-        # select k best
-        sequences = ordered[:k]
-
-    # for elem in arr:
-    #     k_candidates = tf.math.top_k(elem, k).indices
-    #     k_candidates = [tf.keras.backend.get_value(e) for e in k_candidates]
-
-    #     # print("k_candidates:", k_candidates)
-    #     for i in range(k):
-    #         sentence[i].append(keys_list[int(k_candidates[i])])
-    #         if keys_list[int(k_candidates[i])] == "." and sentence[i] != []:
-    #             result[i].append(sentence[i])
-    #             # print("result:", result)
-    #             sentence[i] = []
-
-    #
-    return sequences
+def get_model(model):
+    """builds and returns a model from model's path"""
+    test_model = cm.WordLabelerModel()
+    # print(len(dic_src), len(dic_tar))
+    # print(test_model.summary())
+    test_model.load_weights(
+        model,
+    )
+    test_model.compile(
+        optimizer="adam",
+        loss="categorical_crossentropy",
+        # using categorical cross entropy from keras provided one-hot vectors
+        metrics=[
+            "accuracy",
+            cm.Perplexity(),
+        ],
+    )
+    return test_model
 
 
 def create_text_files(line, k):
@@ -96,9 +61,7 @@ def greedy_decoder(test_model, source, target):
 
     #
     for i, (s, t) in enumerate(zip(source, target)):
-        batch = Batch()
-        batch = create_batch(batch, s, t)
-        print(i)
+        batch = create_batch(Batch(), s, t)
 
         pred_values, tmp_greed = [], []
         for iterator in range(len(batch.source)):
@@ -120,6 +83,7 @@ def greedy_decoder(test_model, source, target):
 
     dic_keys = dic_tar.get_keys()
     path = os.path.join(cur_dir, "predictions", "greedy_prediction.de")
+
     # save greedy search decoder data
     ut.save_list_as_txt(
         path,
@@ -130,55 +94,104 @@ def greedy_decoder(test_model, source, target):
     return path
 
 
-def beam_decoder(test_model, source, target, k):
-    """searches through the output of predict using beam search"""
+def inner_beam(test_model, i, s, t, k):
+    # nonlocal file_txt, test_model
     t_1, t_2 = 0, 0
+    # i, (s, t) in enumerate(zip(source, target)):
 
-    #
-    for i, (s, t) in enumerate(zip(source, target)):
-        if i == 20:
-            break
-        batch = Batch()
-        batch = create_batch(batch, s, t)
-        candidate_sentences = [[[0], 0.0]]
+    if i == 10:
+        return
+    batch = Batch()
+    batch = create_batch(batch, s, t)
+    candidate_sentences = [[[0], 0.0]]
+    pred_values = []
+    test_model = get_model(test_model)
+    for iterator in range(len(batch.source)):
+        all_candidates = []
+        for j in range(len(candidate_sentences)):
+            # get last element to compute next prediction
+            t_2 = candidate_sentences[j][0][-1]
+            # print(t_2)
+            dic = {
+                "I0": np.array([batch.source[iterator]]),
+                "I1": np.array([[t_1, t_2]]),
+            }
+            # prediction step
+            pred_values = test_model.predict(dic, batch_size=1, callbacks=None)[0]
 
-        pred_values = []
-        for iterator in range(len(batch.source)):
-            all_candidates = []
-            for j in range(len(candidate_sentences)):
-                # get last element to compute next prediction
-                t_2 = candidate_sentences[j][0][-1]
-                print(t_2)
-                dic = {
-                    "I0": np.array([batch.source[iterator]]),
-                    "I1": np.array([[t_1, t_2]]),
-                }
-                # prediction step
-                pred_values = test_model.predict(dic, batch_size=1, callbacks=None)[0]
+            # swap values and get the best predictions
+            t_1 = t_2
+            k_best = tf.math.top_k(pred_values, k=k)
+            seq, score = candidate_sentences[j]
+            for l in range(len(k_best)):
+                candidate = [
+                    seq + [get_value(k_best.indices[l])],
+                    score - math.log(get_value(k_best.values[l])),
+                ]
+                all_candidates.append(candidate)
+        ordered = sorted(all_candidates, key=lambda tup: tup[1])
+        candidate_sentences = ordered[:k]
+    return candidate_sentences
 
-                # swap values and get the best predictions
-                t_1 = t_2
-                k_best = tf.math.top_k(pred_values, k=k)
-                seq, score = candidate_sentences[j]
-                for l in range(len(k_best)):
-                    candidate = [
-                        seq + [get_value(k_best.indices[l])],
-                        score - math.log(get_value(k_best.values[l])),
-                    ]
-                    all_candidates.append(candidate)
-            ordered = sorted(all_candidates, key=lambda tup: tup[1])
-            candidate_sentences = ordered[:k]
 
-        create_text_files(candidate_sentences, k)
+def beam_decoder(test_model, source, target, k):
+    file_txt = []
+
+    # open pool for multiprocessing library
+    with multiprocessing.Pool(processes=8) as p:
+        # multiprocessing lines
+        file_txt = p.starmap(
+            inner_beam,
+            zip(
+                itertools.repeat(test_model),
+                range(10),
+                source[:10],
+                target[:10],
+                itertools.repeat(k),
+            ),
+        )
+    p.close()
+    p.join()
+    for e in file_txt:
+        print(e)
+    save_k_txt(file_txt, k)
+
+
+def save_k_txt(file_txt, k):
+    keys_list = dic_tar.get_keys()
+    txt_list = [[] for _ in range(k)]
+    for elem in file_txt:
+        sentence = [[] for _ in range(k)]
+        for i in range(k):
+            str_lines = map(lambda x: keys_list[x], elem[i][0])
+            sentence = list(str_lines)
+            txt_list[i].append(sentence)
+    for i in range(k):
+        ut.save_list_as_txt(
+            os.path.join(
+                cur_dir,
+                "en_de_translation",
+                "beam_k=" + str(k) + "_prediction" + str(i) + ".de",
+            ),
+            txt_list[i],
+        )
+        revert_bpe(
+            os.path.join(
+                cur_dir,
+                "en_de_translation",
+                "beam_k=" + str(k) + "_prediction" + str(i) + ".de",
+            )
+        )
 
 
 def calc_scores(test_model, source, target):
+    test_model = get_model(test_model)
     scores = []
     t_1, t_2 = 0, 0
 
     #
     for i, (s, t) in enumerate(zip(source, target)):
-        if i == 10:
+        if i == 1:
             break
         score = 0
         batch = Batch()
@@ -228,27 +241,12 @@ def loader(model, val_src, val_tar, window=2, mode="b"):
     source, target = get_word_index(src, tar)
     # batch = get_all_batches(source, target, window)
 
-    test_model = custom_model.WordLabelerModel()
-    test_model.load_weights(
-        model,
-    )
-    print(test_model.summary())
-    test_model.compile(
-        optimizer="adam",
-        loss="categorical_crossentropy",
-        # using categorical cross entropy from keras provided one-hot vectors
-        metrics=[
-            "accuracy",
-            custom_model.Perplexity(),
-        ],
-    )
-
     if mode == "b":
-        beam_decoder(test_model, source, target, 3)  # use beam search
+        return beam_decoder(model, source, target, 3)  # use beam search
     if mode == "g":
-        return greedy_decoder(test_model, source, target)  # use greedy search
+        return greedy_decoder(model, source, target)  # use greedy search
     if mode == "s":
-        calc_scores(test_model, source, target)  # calculate Score
+        return calc_scores(model, source, target)  # calculate Score
 
 
 def main():
@@ -257,18 +255,18 @@ def main():
     dic_tar.get_stored(os.path.join(cur_dir, "dictionaries", "target_dictionary"))
 
     # z = [
-    #     os.path.join(os.curdir, "predictions", "beam_k=1_prediction" + str(i) + ".de")
+    #     os.path.join(os.curdir, "predictions", "beam_prediction_k=1_.en")
     #     for i in range(1)
     # ]
 
-    # compare_bleu_scores(os.path.join(cur_dir, "data_exercise_3", "multi30k.dev.de"), z)
+    # compare_bleu_scores(os.path.join(cur_dir, "test_data", "multi30k.dev.en"), z)
 
     # load model and predict outputs
     loader(
         "training_1/train_model.epoch11-loss0.50.hdf5",
         os.path.join(cur_dir, "output", "multi30k.dev_subword.en"),
         os.path.join(cur_dir, "output", "multi30k.dev_subword.de"),
-        mode="g",
+        mode="b",
     )
 
 
