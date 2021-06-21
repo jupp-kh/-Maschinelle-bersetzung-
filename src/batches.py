@@ -94,9 +94,10 @@ def get_pred_batch(line, dev=0, window=2):
                 c_en += 1
         # calculate deviaton
         dev = (dev_en / c_en) / (dev / c_de)
-    print(round(dev * len(line)), (dev * len(line)))
+
+    # print(round(dev * len(line)), (dev * len(line)))
     art_tar = [0 for _ in range(round(dev * len(line)))]
-    return art_tar
+    return create_batch(Batch(), line, art_tar, w=window)
 
 
 def save_batch_as_int(batch):
