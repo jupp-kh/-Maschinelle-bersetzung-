@@ -1,4 +1,6 @@
 import csv
+
+
 from metrics import get_word_len_avr
 import os
 import utility as ut
@@ -32,7 +34,7 @@ class Batch:
 
     @property
     def label(self):
-        """gets target labels """
+        """gets target labels"""
         return self._label
 
     @property
@@ -282,16 +284,59 @@ def get_all_batches(source, target, w):
     return batch
 
 
+def get_max_line(source, target):
+    src = ut.read_from_file(source)
+    tar = ut.read_from_file(target)
+    len_list = map((lambda x: len(x.split())), (src + tar))
+    return max(len_list)
+
+
+def create_batch_rnn(source, target):
+    max_line = get_max_line(source, target)
+    src = ut.read_from_file(source)
+    tar = ut.read_from_file(target)
+    src, tar = get_word_index(src, tar)
+    batch = Batch()
+    for s, t in zip(src, tar):
+        batch.append_s(
+            list(
+                reversed(
+                    [dic_src.get_index("<s>")]
+                    + s
+                    + [dic_src.get_index("</s>") for i in range(max_line - len(s) + 1)]
+                )
+            )
+        )
+        batch.append_t(
+            [dic_tar.get_index("<s>")]
+            + t
+            + [dic_tar.get_index("</s>") for i in range(max_line - len(t) + 1)]
+        )
+        batch.append_l(
+            [dic_tar.get_index("<s>")]
+            + t
+            + [dic_tar.get_index("</s>") for i in range(max_line - len(t) + 1)]
+        )
+
+    return batch
+
+
 def main():
     # call method
-    create_batches(
-        os.path.join(cur_dir, "data_exercise_2", "multi30k.en"),
-        os.path.join(cur_dir, "data_exercise_2", "multi30k.de"),
-        2,
-        as_string=False,
-        start=100,
-        end=500,
+    # create_batches(
+    #     os.path.join(cur_dir, "data_exercise_2", "multi30k.en"),
+    #     os.path.join(cur_dir, "data_exercise_2", "multi30k.de"),
+    #     2,
+    #     as_string=False,
+    #     start=100,
+    #     end=500,
+    # )
+
+    batch = create_batch_rnn(
+        os.path.join(cur_dir, "train_data", "multi30k.en"),
+        os.path.join(cur_dir, "train_data", "multi30k.de"),
     )
+    batch.toString()
 
 
 if __name__ == "__main__":
