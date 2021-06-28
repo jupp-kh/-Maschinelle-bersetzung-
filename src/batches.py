@@ -301,21 +301,17 @@ def create_batch_rnn(source, target):
         batch.append_s(
             list(
                 reversed(
-                    [dic_src.get_index("<s>")]
-                    + s
-                    + [dic_src.get_index("</s>") for i in range(max_line - len(s) + 1)]
+                    s
+                    + [dic_src.get_index("</s>")]
+                    + [0 for i in range(max_line - len(s) + 1)]
                 )
             )
         )
         batch.append_t(
-            [dic_tar.get_index("<s>")]
-            + t
-            + [dic_tar.get_index("</s>") for i in range(max_line - len(t) + 1)]
+            t + [dic_tar.get_index("</s>")] + [0 for i in range(max_line - len(t) + 1)]
         )
         batch.append_l(
-            [dic_tar.get_index("<s>")]
-            + t
-            + [dic_tar.get_index("</s>") for i in range(max_line - len(t) + 1)]
+            t + [dic_tar.get_index("</s>")] + [0 for i in range(max_line - len(t) + 1)]
         )
 
     return batch

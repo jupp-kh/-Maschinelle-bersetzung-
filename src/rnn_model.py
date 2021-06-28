@@ -32,13 +32,11 @@ class Recurrent_model(Model):
         encoder_state = [state_h, state_c]
 
         decoder_input = layers.Input(shape=(None,))
-decoder_embedded = layers.Embedding(input_dim=decoder_vocab, output_dim=64)(
-    decoder_input
-)
+        decoder_embedded = layers.Embedding(input_dim=decoder_vocab, output_dim=64)(
+            decoder_input
+        )
 
-
-
-        super(Recurrent_model, self).__init__()
+        self.super(Recurrent_model, self).__init__()
 
     def train_step(self, data):
         """
@@ -89,7 +87,7 @@ decoder_embedded = layers.Embedding(input_dim=decoder_vocab, output_dim=64)(
             # using categorical cross entropy from keras provided one-hot vectors
             metrics=[
                 "accuracy",
-                Perplexity(),
+                cm.Perplexity(),
             ],
         )
 
