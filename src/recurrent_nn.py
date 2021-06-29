@@ -144,25 +144,42 @@ def train_loop(epochs, data, batch_size, metric_rate, cp_rate):
     model = Translator(len(dic_tar), len(dic_src), 200, 200, batch_size)
     model.compile(optimizer="adam")
 
+    # declare checkpoints
+    # set cp directory rrn_checkpoints
+    CHECKPOINT_DIR = os.path.join(cur_dir, "rnn_checkpoints")
+
     for epoch in range(epochs):
+        loss = 0
         set_off = time.time()
         hidden = model.encoder.initialize_hidden_state()
 
         for (i, batch) in enumerate(data):
-            loss = model.train_step(batch, hidden)
+            b_loss = model.train_step(batch, hidden)
+            loss += b_loss
 
-            if not i % metric_rate:
+            if i % metric_rate == 0:
                 print(
                     "Epoch: {}, Batch: {}, Loss: {:.2f}".format(
-                        epoch + 1, i, loss.numpy()
+                        epoch + 1, i, tf.keras.backend.get_value(b_loss)
                     )
                 )
 
-        if not (epoch + 1) % cp_rate:
-            # save checkpoint
-            pass
+        if (epoch + 1) % cp_rate == 0:
+            model.save_weights(
+                os.path.join(
+                    CHECKPOINT_DIR,
+                    "model.epoch{:02d}-loss{:.2f}.hdf5".format(
+                        epoch + 1, (tf.keras.backend.get_value(loss) / len(data))
+                    ),
+                )
+            )
 
-        print("Epoch: {}, Loss: {:.2f}".format(epoch + 1, loss.numpy()))
+        # NOTE len(data) produces number of batches in epoch
+        print(
+            "Epoch: {}, Loss: {:.2f}".format(
+                epoch + 1, (tf.keras.backend.get_value(loss) / len(data))
+            )
+        )
         print("Time taken: {} sec".format(time.time() - set_off))
 
 
@@ -170,13 +187,15 @@ def preprocess_data(en_path, de_path):
     """called from main to prepare dataset before initiating training"""
     EPOCHS = 1
     BATCH_SZ = 200
-    MET_RATE = 50
+    MET_RATE = 2
     CP_RATE = 1
 
     # prepare dataset
     data = batches.create_batch_rnn(de_path, en_path)
     tarset = tf.data.Dataset.from_tensor_slices(np.array(data.target))
     data = tf.data.Dataset.from_tensor_slices(np.array(data.source))
+
+    # merge both input points
     data = tf.data.Dataset.zip((data, tarset))
     data = data.shuffle(buffer_size=100).batch(batch_size=BATCH_SZ, drop_remainder=True)
     data = data.repeat(EPOCHS)
@@ -191,8 +210,8 @@ def main():
     # encoder = Encoder(len(dic_src), 200, 200, 200)
     # decoder = Decoder(len(dic_tar), 200, 200, 200)
 
-    en_path = os.path.join(cur_dir, "train_data", "min_train.en")
-    de_path = os.path.join(cur_dir, "train_data", "min_train.de")
+    en_path = os.path.join(cur_dir, "train_data", "multi30k.en")
+    de_path = os.path.join(cur_dir, "train_data", "multi30k.de")
     # batch = batches.create_batch_rnn(de_path, en_path)
     preprocess_data(en_path, de_path)
     # dataset = tf.data.Dataset(np.array(batch.source))(
