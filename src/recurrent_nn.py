@@ -63,7 +63,13 @@ class Decoder(tf.keras.Model):
             name="LSTM",
         )
 
-        self.flatten = tf.keras.layers.Flatten(name="Flatten")
+        # tfa required
+        # attention layer
+        # self.attention = BahdanauAttention(num_units)
+
+        self.connection = tf.keras.layers.Dense(
+            num_units, activation="sigmoid", name="ConnectionLayer"
+        )
         # output layer
         self.softmax = Dense(dic_size, activation="softmax", name="Softmax")
 
@@ -72,7 +78,7 @@ class Decoder(tf.keras.Model):
         em = self.embedding(inputs)
         mask = self.embedding.compute_mask(inputs)
         output, _, _ = self.lstm(em, initial_state=enc_output, mask=mask)
-        flat = self.flatten(output)
+        flat = self.connection(output)
         return self.softmax(flat)
 
 
@@ -82,10 +88,10 @@ class Translator(tf.keras.Model):
         self.encoder = Encoder(src_dim, em_dim, num_units, batch_size)
         self.decoder = Decoder(tar_dim, em_dim, num_units, batch_size)
 
-    @tf.function
     def train_step(self, inputs, hidden):
         """implements train_step from Model"""
         inputs, targ = inputs  # split input from Dataset
+        # print(inputs.shape, targ.shape)
         loss = 0
 
         with tf.GradientTape() as tape:
@@ -115,6 +121,7 @@ def init_dics():
 
 def categorical_loss(real, pred):
     """computes and returns categorical cross entropy"""
+    # print(real.shape, pred.shape)
     entropy = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=False)(
         real, pred
     )
@@ -124,52 +131,58 @@ def categorical_loss(real, pred):
     entropy *= mask
 
     # check loss
-    print(tf.keras.backend.get_value(entropy))
+    # print(tf.keras.backend.get_value(entropy))
     # compute the mean of elements across dimensions of entropy
     return tf.reduce_mean(entropy)
 
 
 # epochs, batch_size, metrics_rate and cp_rate should be flexible parameters
-@tf.function
 def train_loop(epochs, data, batch_size, metric_rate, cp_rate):
     """method for RNN train step"""
     # initialise with embedding = 200, units = 200 and batch_size = 200
+
     model = Translator(len(dic_tar), len(dic_src), 200, 200, batch_size)
-    model.compile(
-        optimizer=tf.keras.optimizers.Adam(),
-        loss="sparse_categorical_crossentropy",
-    )
+    model.compile(optimizer="adam")
+
     for epoch in range(epochs):
         set_off = time.time()
         hidden = model.encoder.initialize_hidden_state()
 
-        for (i, batch) in enumerate(data.take(batch_size)):
+        for (i, batch) in enumerate(data):
             loss = model.train_step(batch, hidden)
 
             if not i % metric_rate:
                 print(
-                    "Epoch: {}, Batch: {}, Loss: {:.2f}".format(epoch + 1, i, loss.np())
+                    "Epoch: {}, Batch: {}, Loss: {:.2f}".format(
+                        epoch + 1, i, loss.numpy()
+                    )
                 )
 
         if not (epoch + 1) % cp_rate:
             # save checkpoint
             pass
 
-        print("Epoch: {}, Loss: {:.2f}".format(epoch + 1, loss))
+        print("Epoch: {}, Loss: {:.2f}".format(epoch + 1, loss.numpy()))
         print("Time taken: {} sec".format(time.time() - set_off))
 
 
 def preprocess_data(en_path, de_path):
     """called from main to prepare dataset before initiating training"""
+    EPOCHS = 1
+    BATCH_SZ = 200
+    MET_RATE = 50
+    CP_RATE = 1
+
+    # prepare dataset
     data = batches.create_batch_rnn(de_path, en_path)
-    data = tf.data.Dataset.from_tensor_slices(
-        np.array(list(zip(np.array(data.source), np.array(data.target))))
-    )
-    epochs = 1
-    batch_sz = (200,)
-    met_rate = 50
-    cp_rate = 1
-    train_loop(epochs, data, batch_sz, met_rate, cp_rate)
+    tarset = tf.data.Dataset.from_tensor_slices(np.array(data.target))
+    data = tf.data.Dataset.from_tensor_slices(np.array(data.source))
+    data = tf.data.Dataset.zip((data, tarset))
+    data = data.shuffle(buffer_size=100).batch(batch_size=BATCH_SZ, drop_remainder=True)
+    data = data.repeat(EPOCHS)
+
+    # run the train loop
+    train_loop(EPOCHS, data, BATCH_SZ, MET_RATE, CP_RATE)
 
 
 def main():
@@ -190,7 +203,7 @@ def main():
 
     # o = decoder(np.array(batch.target[:200]), [h, c])
     # print(decoder.summary())
-    print(o, "\n Result: ok!")  # ok?
+    print("\n Result: ok!")  # ok?
 
 
 if __name__ == "__main__":
