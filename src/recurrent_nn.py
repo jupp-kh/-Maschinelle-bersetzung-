@@ -65,7 +65,7 @@ class Decoder(tf.keras.Model):
 
         # tfa required
         # attention layer
-        # self.attention = BahdanauAttention(num_units)
+        self.attention = num_units
 
         self.connection = tf.keras.layers.Dense(
             num_units, activation="sigmoid", name="ConnectionLayer"
@@ -165,10 +165,18 @@ def train_loop(epochs, data, batch_size, metric_rate, cp_rate):
                 )
 
         if (epoch + 1) % cp_rate == 0:
-            model.save_weights(
+            model.encoder.save_weights(  # saving encoder weights
                 os.path.join(
                     CHECKPOINT_DIR,
-                    "model.epoch{:02d}-loss{:.2f}.hdf5".format(
+                    "encoder.epoch{:02d}-loss{:.2f}.hdf5".format(
+                        epoch + 1, (tf.keras.backend.get_value(loss) / len(data))
+                    ),
+                )
+            )
+            model.decoder.save_weights(  # saving decoder weights
+                os.path.join(
+                    CHECKPOINT_DIR,
+                    "decoder.epoch{:02d}-loss{:.2f}.hdf5".format(
                         epoch + 1, (tf.keras.backend.get_value(loss) / len(data))
                     ),
                 )
@@ -210,8 +218,8 @@ def main():
     # encoder = Encoder(len(dic_src), 200, 200, 200)
     # decoder = Decoder(len(dic_tar), 200, 200, 200)
 
-    en_path = os.path.join(cur_dir, "train_data", "multi30k.en")
-    de_path = os.path.join(cur_dir, "train_data", "multi30k.de")
+    en_path = os.path.join(cur_dir, "train_data", "min_train.en")
+    de_path = os.path.join(cur_dir, "train_data", "min_train.de")
     # batch = batches.create_batch_rnn(de_path, en_path)
     preprocess_data(en_path, de_path)
     # dataset = tf.data.Dataset(np.array(batch.source))(
