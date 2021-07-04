@@ -27,15 +27,19 @@ class Encoder(tf.keras.Model):
         self.lstm = tf.keras.layers.LSTM(
             num_units,
             activation="sigmoid",
+            recurrent_activation="sigmoid",
+            recurrent_dropout=0,
+            use_bias=True,
+            unroll=False,
             return_state=True,
             return_sequences=True,
             name="LSTM",
         )
 
-    def call(self, em, hidden):
+    def call(self, inputs, hidden):
         """implements call from keras.Model"""
         # specify embedding input and pass in embedding in lstm layer
-        em = self.embedding(em)
+        em = self.embedding(inputs)
 
         output, h, c = self.lstm(em, initial_state=hidden)
         return output, h, c
@@ -64,7 +68,12 @@ class Decoder(tf.keras.Model):
         # Define the fundamental cell for decoder recurrent structure
         # Sampler classes implement the logic of sampling from the decoder
         # output distribution and producing the inputs for the next decoding step
-        self.decoder_rnn_cell = tf.keras.layers.LSTMCell(self.num_units)
+        self.decoder_rnn_cell = tf.keras.layers.LSTMCell(
+            self.num_units,
+            recurrent_activation="sigmoid",
+            recurrent_dropout=0,
+            use_bias=True,
+        )
         self.sampler = tfa.seq2seq.sampler.TrainingSampler()
 
         # Create attention mechanism with no memory
@@ -72,7 +81,7 @@ class Decoder(tf.keras.Model):
         self.attention_mechanism = tfa.seq2seq.BahdanauAttention(
             units=self.num_units,
             memory=None,
-            memory_sequence_length=batch_size * [46],
+            memory_sequence_length=batch_size * [47],
         )
 
         # Wrap attention mechanism with the fundamental rnn cell of decoder
@@ -104,11 +113,13 @@ class Decoder(tf.keras.Model):
 
     def call(self, inputs, enc_output):
         """implements call from keras.Model"""
+
         em = self.embedding(inputs)
-        # mask = self.embedding.compute_mask(inputs)
         # decoder takes care of the data flow
         output, _, _ = self.decoder(
-            em, initial_state=enc_output, sequence_length=self.batch_size * [46]
+            em,
+            initial_state=enc_output,
+            sequence_length=self.batch_size * [47],
         )
         return output
 
@@ -160,7 +171,7 @@ def init_dics():
 
 def categorical_loss(real, pred):
     """computes and returns categorical cross entropy"""
-    print(real.shape, pred.shape)
+    # print(real.shape, pred.shape)
 
     entropy = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=False)(
         real, pred
@@ -234,10 +245,10 @@ def train_loop(epochs, data, batch_size, metric_rate, cp_rate):
 
 def preprocess_data(en_path, de_path):
     """called from main to prepare dataset before initiating training"""
-    EPOCHS = 1
-    BATCH_SZ = 200
-    MET_RATE = 2
-    CP_RATE = 1
+    EPOCHS = 9
+    BATCH_SZ = 100
+    MET_RATE = 10
+    CP_RATE = 1.5
 
     # prepare dataset
     data = batches.create_batch_rnn(de_path, en_path)
@@ -248,7 +259,7 @@ def preprocess_data(en_path, de_path):
     # merge both input points
     data = tf.data.Dataset.zip((data, tarset))
     data = data.shuffle(buffer_size=100).batch(batch_size=BATCH_SZ, drop_remainder=True)
-    data = data.repeat(EPOCHS)
+    # data = data.repeat(1)
 
     # run the train loop
     return (EPOCHS, data, BATCH_SZ, MET_RATE, CP_RATE)

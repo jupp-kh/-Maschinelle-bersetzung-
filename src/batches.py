@@ -6,7 +6,7 @@ import os
 import utility as ut
 from utility import cur_dir
 import math
-from dictionary import dic_tar
+from dictionary import Dictionary, dic_tar
 from dictionary import dic_src
 
 ############## Globals ###############
@@ -175,6 +175,8 @@ def get_word_index(src, trg):
     uses dictionaries to replace strings with the index
     """
     target, source = [], []
+    dic_src.update("§$", "§$")
+    dic_tar.update("§$", "§$")
     dic_src.update("<s>", "</s>")
     dic_tar.update("<s>", "</s>")
 
@@ -190,7 +192,8 @@ def get_word_index(src, trg):
             tmp_s.append(dic_src.get_index(src_w))
         target.append(tmp_t)
         source.append(tmp_s)
-
+    dic_src.store_dictionary("source_dictionary")
+    dic_tar.store_dictionary("target_dictionary")
     return source, target
 
 
@@ -301,17 +304,24 @@ def create_batch_rnn(source, target):
         batch.append_s(
             list(
                 reversed(
-                    s
+                    [dic_src.get_index("<s>")]
+                    + s
                     + [dic_src.get_index("</s>")]
-                    + [0 for i in range(max_line - len(s) + 1)]
+                    + [dic_src.get_index("</s>") for i in range(max_line - len(s) + 1)]
                 )
             )
         )
         batch.append_t(
-            t + [dic_tar.get_index("</s>")] + [0 for i in range(max_line - len(t) + 1)]
+            [dic_tar.get_index("<s>")]
+            + t
+            + [dic_tar.get_index("</s>")]
+            + [0 for i in range(max_line - len(t))]
         )
         batch.append_l(
-            t + [dic_tar.get_index("</s>")] + [0 for i in range(max_line - len(t) + 1)]
+            [dic_tar.get_index("<s>")]
+            + t
+            + [dic_tar.get_index("</s>")]
+            + [0 for i in range(max_line - len(t))]
         )
 
     return batch
@@ -327,12 +337,17 @@ def main():
     #     start=100,
     #     end=500,
     # )
-
-    batch = create_batch_rnn(
-        os.path.join(cur_dir, "train_data", "multi30k.en"),
-        os.path.join(cur_dir, "train_data", "multi30k.de"),
+    print(
+        get_max_line(
+            os.path.join(cur_dir, "train_data", "multi30k_subword.en"),
+            os.path.join(cur_dir, "train_data", "multi30k_subword.de"),
+        )
     )
-    batch.toString()
+    # batch = create_batch_rnn(
+    #     os.path.join(cur_dir, "train_data", "multi30k.en"),
+    #     os.path.join(cur_dir, "train_data", "multi30k.de"),
+    # )
+    # batch.toString()
 
 
 if __name__ == "__main__":
