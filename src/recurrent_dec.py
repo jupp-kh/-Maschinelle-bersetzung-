@@ -11,6 +11,7 @@ import tensorflow as tf
 from tensorflow.keras.backend import argmax
 from tensorflow.keras.backend import get_value
 import numpy as np
+from tensorflow.python.framework.tensor_conversion_registry import get
 from tensorflow.python.ops.gen_math_ops import mod
 from tensorflow_addons.seq2seq import decoder
 from encoder import revert_bpe
@@ -26,18 +27,30 @@ from utility import cur_dir, read_from_file
 import tensorflow_addons as tfa
 
 
-def get_model(batch_size=1):
+def get_model(source, batch_size=1):
     """builds and returns a model from model's path"""
-    checkpoint = tf.train.Checkpoint()
-    checkpoint.restore(tf.train.latest_checkpoint("rnn_checkpoints"))
+    enc, dec = get_enc_dec_paths()
+    test_model = rnn.Translator(len(dic_tar), len(dic_src), 200, 200, batch_size)
 
-    checkpoint.decoder.summary()
+    # initialize layers
+    enc_output, h, c = test_model.encoder(
+        source, test_model.encoder.initialize_hidden_state()
+    )
+
+    test_model.decoder.attention_mechanism.setup_memory(enc_output)
+
+    dec_init = test_model.decoder.build_initial_state(batch_size, [h, c], tf.float32)
+
+    test_model.decoder(tf.zeros((batch_size, 47)), dec_init)
+
+    test_model.encoder.load_weights(enc)
+    test_model.decoder.load_weights(dec)
 
     # compile then return loaded model
-    checkpoint.compile(
+    test_model.compile(
         optimizer="adam",
     )
-    return checkpoint
+    return test_model, enc_output, h, c
 
 
 def save_k_txt(file_txt, k):
@@ -87,22 +100,28 @@ def translate_line(i, source, k):
 
     # beam decoder
     beam_instance = tfa.seq2seq.BeamSearchDecoder(
-        model.decoder.rnn_cell, beam_width=k, output_layer=model.decoder.softmax
+        model.decoder.rnn_cell,
+        beam_width=k,
+        output_layer=model.decoder.fc,
+        maximum_iterations=47,
     )
+    inference_decoder_output = tfa.seq2seq.dynamic_decode(
+        beam_instance, impute_finished=False
+    )[0]
 
-    embedding_matrix = model.decoder.embedding.variables[0]
+    # embedding_matrix = model.decoder.embedding.variables[0]
 
-    output, _, _ = beam_instance(
-        embedding_matrix,
-        start_tokens=[0],
-        end_token=14,
-        initial_state=decoder_init_state,
-    )
-    print("iam here")
-    final_outputs = tf.transpose(output.predicted_ids, perm=(0, 2, 1))
-    beam_scores = tf.transpose(output.beam_search_decoder_output.scores, perm=(0, 2, 1))
+    # output, _, _ = beam_instance(
+    #     embedding_matrix,
+    #     start_tokens=[0],
+    #     end_token=14,
+    #     initial_state=decoder_init_state,
+    # )
+    # print("iam here")
+    # final_outputs = tf.transpose(output.predicted_ids, perm=(0, 2, 1))
+    # beam_scores = tf.transpose(output.beam_search_decoder_output.scores, perm=(0, 2, 1))
 
-    return final_outputs.numpy(), beam_scores.numpy()
+    return inference_decoder_output  # final_outputs.numpy(), beam_scores.numpy()
 
 
 def beam_decoder(source, k):
@@ -142,10 +161,54 @@ def rnn_pred_batch(source_list, target_list):
 
 def get_enc_dec_paths():
     """returns encoder and decoder path as tuple"""
-    enc_path = os.path.join(cur_dir, "rnn_checkpoints", "encoder.epoch01-loss0.65.hdf5")
-    dec_path = os.path.join(cur_dir, "rnn_checkpoints", "decoder.epoch01-loss0.65.hdf5")
+    enc_path = os.path.join(cur_dir, "rnn_checkpoints", "encoder.epoch01-loss1.51.hdf5")
+    dec_path = os.path.join(cur_dir, "rnn_checkpoints", "decoder.epoch01-loss1.51.hdf5")
 
     return (enc_path, dec_path)
+
+
+def evaluate_sentence(sentence):
+    """evals sentence"""
+    print(sentence)
+    model = get_model(sentence)[0]
+
+    inputs = tf.convert_to_tensor(sentence)
+    inference_batch_size = inputs.shape[0]
+    print(inference_batch_size)
+    result = ""
+
+    enc_start_state = [
+        tf.zeros((inference_batch_size, 200)),
+        tf.zeros((inference_batch_size, 200)),
+    ]
+    enc_out, enc_h, enc_c = model.encoder(inputs, enc_start_state)
+    start_tokens = tf.fill([inference_batch_size], 1)
+    end_token = 2
+
+    greedy_sampler = tfa.seq2seq.GreedyEmbeddingSampler()
+
+    # Instantiate BasicDecoder object
+    decoder_initial_state = model.decoder.build_initial_state(
+        inference_batch_size, [enc_h, enc_c], tf.float32
+    )
+    decoder_embedding_matrix = model.decoder.embedding.variables[0]
+
+    decoder_instance = tfa.seq2seq.BasicDecoder(
+        cell=model.decoder.rnn_cell,
+        sampler=greedy_sampler,
+        output_layer=model.decoder.fc,
+        maximum_iterations=47,
+    )
+    # Setup Memory in decoder stack
+    model.decoder.attention_mechanism.setup_memory(enc_out)
+
+    outputs, _, _ = decoder_instance(
+        decoder_embedding_matrix,
+        start_tokens=start_tokens,
+        end_token=end_token,
+        initial_state=decoder_initial_state,
+    )
+    return outputs.sample_id.numpy()
 
 
 def main():
@@ -161,18 +224,19 @@ def main():
     inputs = rnn_pred_batch(
         ["eine gruppe von männern lädt baum@@ wolle auf einen lastwagen ."], target
     )
-    inputs = tf.convert_to_tensor(inputs)
-    print(inputs)
-    f, s = translate_line(1, inputs, 1)
-    print(f, s)
+    print(evaluate_sentence(inputs))
+    # inputs = tf.convert_to_tensor(inputs)
+    # print(inputs)
+    # f, s = translate_line(1, inputs, 1)
+    # print(f, s)
 
 
 def rec_dec_tester():
     """called for testing specific methods"""
     rnn.init_dics()
-    m = get_model()
+    m = get_model(None)
 
 
 if __name__ == "__main__":
-    # main()
-    rec_dec_tester()
+    main()
+    # rec_dec_tester()

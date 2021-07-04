@@ -12,6 +12,7 @@ from utility import cur_dir
 import batches
 import tensorflow_addons as tfa
 
+
 # from decoder import loader, greedy_decoder
 
 # import config file for hyperparameter search space
@@ -52,76 +53,87 @@ class Encoder(tf.keras.Model):
 
 
 class Decoder(tf.keras.Model):
-    def __init__(self, dic_size, em_dim, num_units, batch_size, **kwargs):
-        """implements init from keras.Model"""
-        super(Decoder, self).__init__(**kwargs)
-        self.batch_size = batch_size
-        self.num_units = num_units
+    def __init__(
+        self, vocab_size, embedding_dim, dec_units, batch_sz, attention_type="luong"
+    ):
+        super(Decoder, self).__init__()
+        self.batch_sz = batch_sz
+        self.dec_units = dec_units
+        self.attention_type = attention_type
 
         # Embedding Layer
-        self.embedding = tf.keras.layers.Embedding(dic_size, em_dim)
+        self.embedding = tf.keras.layers.Embedding(vocab_size, embedding_dim)
 
-        # sofmax layer for decoder output
-        self.softmax = tf.keras.layers.Dense(dic_size, activation="softmax")
+        # Final Dense layer on which softmax will be applied
+        self.fc = tf.keras.layers.Dense(vocab_size)
 
-        # needed for beam decoder provided by tfa
         # Define the fundamental cell for decoder recurrent structure
-        # Sampler classes implement the logic of sampling from the decoder
-        # output distribution and producing the inputs for the next decoding step
-        self.decoder_rnn_cell = tf.keras.layers.LSTMCell(
-            self.num_units,
-            recurrent_activation="sigmoid",
-            recurrent_dropout=0,
-            use_bias=True,
-        )
+        self.decoder_rnn_cell = tf.keras.layers.LSTMCell(self.dec_units)
+
+        # Sampler
         self.sampler = tfa.seq2seq.sampler.TrainingSampler()
 
-        # Create attention mechanism with no memory
-        # currently using BahdanauAttention
-        self.attention_mechanism = tfa.seq2seq.BahdanauAttention(
-            units=self.num_units,
-            memory=None,
-            memory_sequence_length=batch_size * [47],
+        # Create attention mechanism with memory = None
+        self.attention_mechanism = self.build_attention_mechanism(
+            self.dec_units,
+            None,
+            self.batch_sz * [47],
+            self.attention_type,
         )
 
         # Wrap attention mechanism with the fundamental rnn cell of decoder
-        self.rnn_cell = self.build_rnn_cell(batch_size)
+        self.rnn_cell = self.build_rnn_cell(batch_sz)
 
         # Define the decoder with respect to fundamental rnn cell
         self.decoder = tfa.seq2seq.BasicDecoder(
-            self.rnn_cell, sampler=self.sampler, output_layer=self.softmax
+            self.rnn_cell, sampler=self.sampler, output_layer=self.fc
         )
-
-    def build_init_state(self, batch_sz, h, c, dtype):
-        """build initial state for decoder using encoder_initial_state.clone(cell_state=encoder_state)
-        return decoder_initial_stateder_initial_state.clone(cell_state=encoder_state)
-        return decoder_initial_stateder_initial_state.clone(cell_state=encoder_state)
-        return decoder_initial_stateder outputs [h,c]"""
-        decoder_initial_state = self.rnn_cell.get_initial_state(
-            batch_size=batch_sz, dtype=dtype
-        )
-        decoder_initial_state = decoder_initial_state.clone(cell_state=[h, c])
-        return decoder_initial_state
 
     def build_rnn_cell(self, batch_sz):
         rnn_cell = tfa.seq2seq.AttentionWrapper(
             self.decoder_rnn_cell,
             self.attention_mechanism,
-            attention_layer_size=batch_sz,
+            attention_layer_size=self.dec_units,
         )
         return rnn_cell
 
-    def call(self, inputs, enc_output):
-        """implements call from keras.Model"""
+    def build_attention_mechanism(
+        self, dec_units, memory, memory_sequence_length, attention_type="luong"
+    ):
+        # ------------- #
+        # typ: Which sort of attention (Bahdanau, Luong)
+        # dec_units: final dimension of attention outputs
+        # memory: encoder hidden states of shape (batch_size, 47, enc_units)
+        # memory_sequence_length: 1d array of shape (batch_size) with every element set to 47 (for masking purpose)
 
-        em = self.embedding(inputs)
-        # decoder takes care of the data flow
-        output, _, _ = self.decoder(
-            em,
-            initial_state=enc_output,
-            sequence_length=self.batch_size * [47],
+        if attention_type == "bahdanau":
+            return tfa.seq2seq.BahdanauAttention(
+                units=dec_units,
+                memory=memory,
+                memory_sequence_length=memory_sequence_length,
+            )
+        else:
+            return tfa.seq2seq.LuongAttention(
+                units=dec_units,
+                memory=memory,
+                memory_sequence_length=memory_sequence_length,
+            )
+
+    def build_initial_state(self, batch_sz, encoder_state, Dtype):
+        decoder_initial_state = self.rnn_cell.get_initial_state(
+            batch_size=batch_sz, dtype=Dtype
         )
-        return output
+        decoder_initial_state = decoder_initial_state.clone(cell_state=encoder_state)
+        return decoder_initial_state
+
+    def call(self, inputs, initial_state):
+        x = self.embedding(inputs)
+        outputs, _, _ = self.decoder(
+            x,
+            initial_state=initial_state,
+            sequence_length=self.batch_sz * [47],
+        )
+        return outputs
 
 
 class Translator(tf.keras.Model):
@@ -144,8 +156,8 @@ class Translator(tf.keras.Model):
             self.decoder.attention_mechanism.setup_memory(enc_output)
 
             # initialise AttentionWrapper state as initial state for decoder
-            decoder_init_state = self.decoder.build_init_state(
-                self.decoder.batch_size, h, c, tf.float32
+            decoder_init_state = self.decoder.build_initial_state(
+                self.decoder.batch_sz, [h, c], tf.float32
             )
             # pass input into decoder
             dec_output = self.decoder(targ, decoder_init_state)
@@ -173,7 +185,7 @@ def categorical_loss(real, pred):
     """computes and returns categorical cross entropy"""
     # print(real.shape, pred.shape)
 
-    entropy = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=False)(
+    entropy = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)(
         real, pred
     )
     # mask unnecessary symbols
@@ -198,10 +210,6 @@ def train_loop(epochs, data, batch_size, metric_rate, cp_rate):
     # declare checkpoints
     # set cp directory rrn_checkpoints
     CHECKPOINT_DIR = os.path.join(cur_dir, "rnn_checkpoints")
-    checkpoint_prefix = os.path.join(CHECKPOINT_DIR, "ckpt")
-    checkpoint = tf.train.Checkpoint(
-        optimizer=model.optimizer, encoder=model.encoder, decoder=model.decoder
-    )
 
     for epoch in range(epochs):
         loss = 0
@@ -221,7 +229,22 @@ def train_loop(epochs, data, batch_size, metric_rate, cp_rate):
                 )
 
         if (epoch + 1) % cp_rate == 0:
-            checkpoint.save(file_prefix=checkpoint_prefix)
+            model.encoder.save_weights(  # saving encoder weights
+                os.path.join(
+                    CHECKPOINT_DIR,
+                    "encoder.epoch{:02d}-loss{:.2f}.hdf5".format(
+                        epoch + 1, (tf.keras.backend.get_value(loss) / len(data))
+                    ),
+                )
+            )
+            model.decoder.save_weights(  # saving decoder weights
+                os.path.join(
+                    CHECKPOINT_DIR,
+                    "decoder.epoch{:02d}-loss{:.2f}.hdf5".format(
+                        epoch + 1, (tf.keras.backend.get_value(loss) / len(data))
+                    ),
+                )
+            )
 
         # NOTE len(data) produces number of batches in epoch
         print(
@@ -234,7 +257,7 @@ def train_loop(epochs, data, batch_size, metric_rate, cp_rate):
 
 def preprocess_data(en_path, de_path):
     """called from main to prepare dataset before initiating training"""
-    EPOCHS = 9
+    EPOCHS = 1
     BATCH_SZ = 200
     MET_RATE = 10
     CP_RATE = 1
