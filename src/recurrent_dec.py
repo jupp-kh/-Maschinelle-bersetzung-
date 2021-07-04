@@ -26,30 +26,18 @@ from utility import cur_dir, read_from_file
 import tensorflow_addons as tfa
 
 
-def get_model(source, batch_size=1):
+def get_model(batch_size=1):
     """builds and returns a model from model's path"""
-    enc, dec = get_enc_dec_paths()
-    test_model = rnn.Translator(len(dic_tar), len(dic_src), 200, 200, batch_size)
+    checkpoint = tf.train.Checkpoint()
+    checkpoint.restore(tf.train.latest_checkpoint("rnn_checkpoints"))
 
-    # initialize layers
-    enc_output, h, c = test_model.encoder(
-        source, test_model.encoder.initialize_hidden_state()
-    )
-
-    test_model.decoder.attention_mechanism.setup_memory(enc_output)
-
-    dec_init = test_model.decoder.build_init_state(batch_size, h, c, tf.float32)
-
-    test_model.decoder(tf.zeros((batch_size, 47)), dec_init)
-
-    test_model.encoder.load_weights(enc)
-    test_model.decoder.load_weights(dec)
+    checkpoint.decoder.summary()
 
     # compile then return loaded model
-    test_model.compile(
+    checkpoint.compile(
         optimizer="adam",
     )
-    return test_model, enc_output, h, c
+    return checkpoint
 
 
 def save_k_txt(file_txt, k):
@@ -154,8 +142,8 @@ def rnn_pred_batch(source_list, target_list):
 
 def get_enc_dec_paths():
     """returns encoder and decoder path as tuple"""
-    enc_path = os.path.join(cur_dir, "rnn_checkpoints", "encoder.epoch03-loss0.10.hdf5")
-    dec_path = os.path.join(cur_dir, "rnn_checkpoints", "decoder.epoch03-loss0.10.hdf5")
+    enc_path = os.path.join(cur_dir, "rnn_checkpoints", "encoder.epoch01-loss0.65.hdf5")
+    dec_path = os.path.join(cur_dir, "rnn_checkpoints", "decoder.epoch01-loss0.65.hdf5")
 
     return (enc_path, dec_path)
 
@@ -174,6 +162,7 @@ def main():
         ["eine gruppe von männern lädt baum@@ wolle auf einen lastwagen ."], target
     )
     inputs = tf.convert_to_tensor(inputs)
+    print(inputs)
     f, s = translate_line(1, inputs, 1)
     print(f, s)
 
@@ -185,5 +174,5 @@ def rec_dec_tester():
 
 
 if __name__ == "__main__":
-    main()
-    # rec_dec_tester()
+    # main()
+    rec_dec_tester()

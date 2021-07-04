@@ -107,7 +107,7 @@ class Decoder(tf.keras.Model):
         rnn_cell = tfa.seq2seq.AttentionWrapper(
             self.decoder_rnn_cell,
             self.attention_mechanism,
-            attention_layer_size=self.num_units,
+            attention_layer_size=batch_sz,
         )
         return rnn_cell
 
@@ -198,6 +198,10 @@ def train_loop(epochs, data, batch_size, metric_rate, cp_rate):
     # declare checkpoints
     # set cp directory rrn_checkpoints
     CHECKPOINT_DIR = os.path.join(cur_dir, "rnn_checkpoints")
+    checkpoint_prefix = os.path.join(CHECKPOINT_DIR, "ckpt")
+    checkpoint = tf.train.Checkpoint(
+        optimizer=model.optimizer, encoder=model.encoder, decoder=model.decoder
+    )
 
     for epoch in range(epochs):
         loss = 0
@@ -217,22 +221,7 @@ def train_loop(epochs, data, batch_size, metric_rate, cp_rate):
                 )
 
         if (epoch + 1) % cp_rate == 0:
-            model.encoder.save_weights(  # saving encoder weights
-                os.path.join(
-                    CHECKPOINT_DIR,
-                    "encoder.epoch{:02d}-loss{:.2f}.hdf5".format(
-                        epoch + 1, (tf.keras.backend.get_value(loss) / len(data))
-                    ),
-                )
-            )
-            model.decoder.save_weights(  # saving decoder weights
-                os.path.join(
-                    CHECKPOINT_DIR,
-                    "decoder.epoch{:02d}-loss{:.2f}.hdf5".format(
-                        epoch + 1, (tf.keras.backend.get_value(loss) / len(data))
-                    ),
-                )
-            )
+            checkpoint.save(file_prefix=checkpoint_prefix)
 
         # NOTE len(data) produces number of batches in epoch
         print(
@@ -246,9 +235,9 @@ def train_loop(epochs, data, batch_size, metric_rate, cp_rate):
 def preprocess_data(en_path, de_path):
     """called from main to prepare dataset before initiating training"""
     EPOCHS = 9
-    BATCH_SZ = 100
+    BATCH_SZ = 200
     MET_RATE = 10
-    CP_RATE = 1.5
+    CP_RATE = 1
 
     # prepare dataset
     data = batches.create_batch_rnn(de_path, en_path)
