@@ -192,8 +192,8 @@ def get_word_index(src, trg):
             tmp_s.append(dic_src.get_index(src_w))
         target.append(tmp_t)
         source.append(tmp_s)
-    dic_src.store_dictionary("source_dictionary")
-    dic_tar.store_dictionary("target_dictionary")
+    # dic_src.store_dictionary("source_dictionary")
+    # dic_tar.store_dictionary("target_dictionary")
     return source, target
 
 
