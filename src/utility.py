@@ -1,8 +1,26 @@
 import sys, time, threading
 import os
 import csv
+import subprocess
 
 cur_dir = os.path.dirname(__file__)
+
+
+def max_word_in_line(filepath):
+    """returns max number of words in line"""
+    awk = (
+        "awk 'NF > max_length { max_length = NF; longest_line = $0 } END { print max_length }'"
+        + str(filepath)
+    )
+    awk = subprocess.Popen(
+        awk,
+        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        universal_newlines=True,
+    )
+    return awk.communicate()[0]
+
 
 # process function for animation
 def proc_function():

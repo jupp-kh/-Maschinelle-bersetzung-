@@ -10,6 +10,7 @@ from tensorflow._api.v2 import train
 from dictionary import dic_tar, dic_src
 from utility import cur_dir
 import batches
+import tensorflow_addons as tfa
 
 # from decoder import loader, greedy_decoder
 
@@ -53,33 +54,63 @@ class Decoder(tf.keras.Model):
         self.batch_size = batch_size
         self.num_units = num_units
 
-        # input layer and lstm layer
-        self.embedding = tf.keras.layers.Embedding(dic_size, em_dim, name="Embedding")
-        self.lstm = tf.keras.layers.LSTM(
-            num_units,
-            activation="sigmoid",
-            return_state=True,
-            return_sequences=True,
-            name="LSTM",
+        # Embedding Layer
+        self.embedding = tf.keras.layers.Embedding(dic_size, em_dim)
+
+        # sofmax layer for decoder output
+        self.softmax = tf.keras.layers.Dense(dic_size, activation="softmax")
+
+        # needed for beam decoder provided by tfa
+        # Define the fundamental cell for decoder recurrent structure
+        # Sampler classes implement the logic of sampling from the decoder
+        # output distribution and producing the inputs for the next decoding step
+        self.decoder_rnn_cell = tf.keras.layers.LSTMCell(self.num_units)
+        self.sampler = tfa.seq2seq.sampler.TrainingSampler()
+
+        # Create attention mechanism with no memory
+        # currently using BahdanauAttention
+        self.attention_mechanism = tfa.seq2seq.BahdanauAttention(
+            units=self.num_units,
+            memory=None,
+            memory_sequence_length=batch_size * [46],
         )
 
-        # tfa required
-        # attention layer
-        self.attention = num_units
+        # Wrap attention mechanism with the fundamental rnn cell of decoder
+        self.rnn_cell = self.build_rnn_cell(batch_size)
 
-        self.connection = tf.keras.layers.Dense(
-            num_units, activation="sigmoid", name="ConnectionLayer"
+        # Define the decoder with respect to fundamental rnn cell
+        self.decoder = tfa.seq2seq.BasicDecoder(
+            self.rnn_cell, sampler=self.sampler, output_layer=self.softmax
         )
-        # output layer
-        self.softmax = Dense(dic_size, activation="softmax", name="Softmax")
+
+    def build_init_state(self, batch_sz, h, c, dtype):
+        """build initial state for decoder using encoder_initial_state.clone(cell_state=encoder_state)
+        return decoder_initial_stateder_initial_state.clone(cell_state=encoder_state)
+        return decoder_initial_stateder_initial_state.clone(cell_state=encoder_state)
+        return decoder_initial_stateder outputs [h,c]"""
+        decoder_initial_state = self.rnn_cell.get_initial_state(
+            batch_size=batch_sz, dtype=dtype
+        )
+        decoder_initial_state = decoder_initial_state.clone(cell_state=[h, c])
+        return decoder_initial_state
+
+    def build_rnn_cell(self, batch_sz):
+        rnn_cell = tfa.seq2seq.AttentionWrapper(
+            self.decoder_rnn_cell,
+            self.attention_mechanism,
+            attention_layer_size=self.num_units,
+        )
+        return rnn_cell
 
     def call(self, inputs, enc_output):
         """implements call from keras.Model"""
         em = self.embedding(inputs)
-        mask = self.embedding.compute_mask(inputs)
-        output, _, _ = self.lstm(em, initial_state=enc_output, mask=mask)
-        flat = self.connection(output)
-        return self.softmax(flat)
+        # mask = self.embedding.compute_mask(inputs)
+        # decoder takes care of the data flow
+        output, _, _ = self.decoder(
+            em, initial_state=enc_output, sequence_length=self.batch_size * [46]
+        )
+        return output
 
 
 class Translator(tf.keras.Model):
@@ -96,12 +127,19 @@ class Translator(tf.keras.Model):
 
         with tf.GradientTape() as tape:
             # pass input into encoder
-            _, h, c = self.encoder(inputs, hidden)
+            enc_output, h, c = self.encoder(inputs, hidden)
 
-            # TODO later attention mechanism
+            # attention mechanism - done
+            self.decoder.attention_mechanism.setup_memory(enc_output)
 
+            # initialise AttentionWrapper state as initial state for decoder
+            decoder_init_state = self.decoder.build_init_state(
+                self.decoder.batch_size, h, c, tf.float32
+            )
             # pass input into decoder
-            dec_output = self.decoder(targ, [h, c])
+            dec_output = self.decoder(targ, decoder_init_state)
+            dec_output = dec_output.rnn_output
+            # targ represent the real values whilst dec_output is a softmax layer
             loss = categorical_loss(targ, dec_output)
 
         var = self.encoder.trainable_variables + self.decoder.trainable_variables
@@ -109,7 +147,8 @@ class Translator(tf.keras.Model):
 
         # apply gradients and return loss
         self.optimizer.apply_gradients(zip(gradients, var))
-        return loss  # update later to include metrics
+        # TODO update later to include metrics
+        return loss
 
 
 # init dictionaries
@@ -121,7 +160,8 @@ def init_dics():
 
 def categorical_loss(real, pred):
     """computes and returns categorical cross entropy"""
-    # print(real.shape, pred.shape)
+    print(real.shape, pred.shape)
+
     entropy = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=False)(
         real, pred
     )
@@ -154,6 +194,7 @@ def train_loop(epochs, data, batch_size, metric_rate, cp_rate):
         hidden = model.encoder.initialize_hidden_state()
 
         for (i, batch) in enumerate(data):
+            # batch loss and epoch avr loss
             b_loss = model.train_step(batch, hidden)
             loss += b_loss
 
@@ -200,6 +241,7 @@ def preprocess_data(en_path, de_path):
 
     # prepare dataset
     data = batches.create_batch_rnn(de_path, en_path)
+
     tarset = tf.data.Dataset.from_tensor_slices(np.array(data.target))
     data = tf.data.Dataset.from_tensor_slices(np.array(data.source))
 
@@ -209,7 +251,7 @@ def preprocess_data(en_path, de_path):
     data = data.repeat(EPOCHS)
 
     # run the train loop
-    train_loop(EPOCHS, data, BATCH_SZ, MET_RATE, CP_RATE)
+    return (EPOCHS, data, BATCH_SZ, MET_RATE, CP_RATE)
 
 
 def main():
@@ -218,10 +260,12 @@ def main():
     # encoder = Encoder(len(dic_src), 200, 200, 200)
     # decoder = Decoder(len(dic_tar), 200, 200, 200)
 
-    en_path = os.path.join(cur_dir, "train_data", "min_train.en")
-    de_path = os.path.join(cur_dir, "train_data", "min_train.de")
+    en_path = os.path.join(cur_dir, "train_data", "multi30k_subword.en")
+    de_path = os.path.join(cur_dir, "train_data", "multi30k_subword.de")
     # batch = batches.create_batch_rnn(de_path, en_path)
-    preprocess_data(en_path, de_path)
+    epochs, data, sz, met, cp = preprocess_data(en_path, de_path)
+    train_loop(epochs, data, sz, met, cp)
+
     # dataset = tf.data.Dataset(np.array(batch.source))(
     #     batch_size=200, drop_remainder=True
     # )
