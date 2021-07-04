@@ -24,7 +24,9 @@ class Encoder(tf.keras.Model):
         super(Encoder, self).__init__(**kwargs)
         self.batch_size = batch_size
         self.num_units = num_units
-        self.embedding = tf.keras.layers.Embedding(dic_size, em_dim, name="Embedding")
+        self.embedding = tf.keras.layers.Embedding(
+            dic_size, em_dim, name="Embedding", mask_zero=True
+        )
         self.lstm = tf.keras.layers.LSTM(
             num_units,
             activation="sigmoid",
@@ -185,9 +187,9 @@ def categorical_loss(real, pred):
     """computes and returns categorical cross entropy"""
     # print(real.shape, pred.shape)
 
-    entropy = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)(
-        real, pred
-    )
+    entropy = tf.keras.losses.SparseCategoricalCrossentropy(
+        from_logits=True, reduction="none"
+    )(real, pred)
     # mask unnecessary symbols
     mask = tf.logical_not(tf.math.equal(real, 0))
     mask = tf.cast(mask, dtype=entropy.dtype)
@@ -257,7 +259,7 @@ def train_loop(epochs, data, batch_size, metric_rate, cp_rate):
 
 def preprocess_data(en_path, de_path):
     """called from main to prepare dataset before initiating training"""
-    EPOCHS = 1
+    EPOCHS = 9
     BATCH_SZ = 200
     MET_RATE = 10
     CP_RATE = 1

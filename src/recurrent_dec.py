@@ -151,18 +151,18 @@ def beam_decoder(source, k):
 def rnn_pred_batch(source_list, target_list):
     """returns a batch from source file by padding all sentences"""
     source_list, _ = get_word_index(source_list, target_list)
-    source_list = list(map(lambda x: [0] + list(x) + [1], source_list))
+    source_list = list(map(lambda x: [1] + list(x) + [2], source_list))
 
     # instead of maxlen=46 use max_word_in_line
     return tf.keras.preprocessing.sequence.pad_sequences(
-        source_list, maxlen=47, value=1, padding="post"
+        source_list, maxlen=47, value=0, padding="pre"
     )
 
 
 def get_enc_dec_paths():
     """returns encoder and decoder path as tuple"""
-    enc_path = os.path.join(cur_dir, "rnn_checkpoints", "encoder.epoch01-loss1.51.hdf5")
-    dec_path = os.path.join(cur_dir, "rnn_checkpoints", "decoder.epoch01-loss1.51.hdf5")
+    enc_path = os.path.join(cur_dir, "rnn_checkpoints", "encoder.epoch01-loss1.55.hdf5")
+    dec_path = os.path.join(cur_dir, "rnn_checkpoints", "decoder.epoch01-loss1.55.hdf5")
 
     return (enc_path, dec_path)
 
@@ -197,7 +197,6 @@ def evaluate_sentence(sentence):
         cell=model.decoder.rnn_cell,
         sampler=greedy_sampler,
         output_layer=model.decoder.fc,
-        maximum_iterations=47,
     )
     # Setup Memory in decoder stack
     model.decoder.attention_mechanism.setup_memory(enc_out)
