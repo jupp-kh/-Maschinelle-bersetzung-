@@ -19,19 +19,19 @@ stages:
 
 
 
-unittest-test:
-  image: tmaier/docker-compose
+# unittest-test:
+#   image: tmaier/docker-compose
 
-  services:
-    - docker:dind
+#   services:
+#     - docker:dind
 
-  stage: test
+#   stage: test
 
-  before_script:
-    - docker-compose build --no-cache
+#   before_script:
+#     - docker-compose build --no-cache
 
-  script:
-    - docker-compose run ci-series python -m unittest discover -s ./tests
+#   script:
+#     - docker-compose run ci-series python -m unittest discover -s ./tests
 
 
 
