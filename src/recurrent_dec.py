@@ -155,27 +155,25 @@ def rnn_pred_batch(source_list, target_list):
 
     # instead of maxlen=46 use max_word_in_line
     return tf.keras.preprocessing.sequence.pad_sequences(
-        source_list, maxlen=47, value=0, padding="pre"
+        source_list, maxlen=47, value=0, padding="post"
     )
 
 
 def get_enc_dec_paths():
     """returns encoder and decoder path as tuple"""
-    enc_path = os.path.join(cur_dir, "rnn_checkpoints", "encoder.epoch01-loss1.55.hdf5")
-    dec_path = os.path.join(cur_dir, "rnn_checkpoints", "decoder.epoch01-loss1.55.hdf5")
+    enc_path = os.path.join(cur_dir, "rnn_checkpoints", "encoder.epoch01-loss1.65.hdf5")
+    dec_path = os.path.join(cur_dir, "rnn_checkpoints", "decoder.epoch01-loss1.65.hdf5")
 
     return (enc_path, dec_path)
 
 
-def evaluate_sentence(sentence):
+def evaluate_sentence(model, sentence):
     """evals sentence"""
-    print(sentence)
-    model = get_model(sentence)[0]
+    # model = get_model(sentence)[0]
 
     inputs = tf.convert_to_tensor(sentence)
     inference_batch_size = inputs.shape[0]
-    print(inference_batch_size)
-    result = ""
+    print(inputs)
 
     enc_start_state = [
         tf.zeros((inference_batch_size, 200)),
@@ -197,6 +195,7 @@ def evaluate_sentence(sentence):
         cell=model.decoder.rnn_cell,
         sampler=greedy_sampler,
         output_layer=model.decoder.fc,
+        maximum_iterations=4000,
     )
     # Setup Memory in decoder stack
     model.decoder.attention_mechanism.setup_memory(enc_out)
@@ -210,7 +209,7 @@ def evaluate_sentence(sentence):
     return outputs.sample_id.numpy()
 
 
-def main():
+def main(model):
     """main method"""
     rnn.init_dics()
     source = read_from_file(
@@ -223,7 +222,9 @@ def main():
     inputs = rnn_pred_batch(
         ["eine gruppe von männern lädt baum@@ wolle auf einen lastwagen ."], target
     )
-    print(evaluate_sentence(inputs))
+    keys = dic_tar.get_keys()
+    output = evaluate_sentence(model, inputs)
+    print([keys[x] for x in output])
     # inputs = tf.convert_to_tensor(inputs)
     # print(inputs)
     # f, s = translate_line(1, inputs, 1)

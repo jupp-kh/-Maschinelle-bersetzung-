@@ -303,25 +303,23 @@ def create_batch_rnn(source, target):
     for s, t in zip(src, tar):
         batch.append_s(
             list(
-                reversed(
-                    [dic_src.get_index("<s>")]
-                    + s
-                    + [dic_src.get_index("</s>")]
-                    + [dic_src.get_index("</s>") for i in range(max_line - len(s) + 1)]
-                )
+                [dic_src.get_index("<s>")]
+                + s
+                + [dic_src.get_index("</s>")]
+                + [0 for _ in range(max_line - len(s) + 1)]
             )
         )
         batch.append_t(
             [dic_tar.get_index("<s>")]
             + t
             + [dic_tar.get_index("</s>")]
-            + [0 for i in range(max_line - len(t))]
+            + [0 for _ in range(max_line - len(t))]
         )
         batch.append_l(
-            [dic_tar.get_index("<s>")]
-            + t
+            t
             + [dic_tar.get_index("</s>")]
-            + [0 for i in range(max_line - len(t))]
+            + [0 for _ in range(max_line - len(t))]
+            + [dic_tar.get_index("<s>")]
         )
 
     return batch

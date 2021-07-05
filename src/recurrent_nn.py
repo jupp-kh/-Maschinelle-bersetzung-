@@ -11,6 +11,7 @@ from dictionary import dic_tar, dic_src
 from utility import cur_dir
 import batches
 import tensorflow_addons as tfa
+import recurrent_dec as rnn_dec
 
 
 # from decoder import loader, greedy_decoder
@@ -28,14 +29,10 @@ class Encoder(tf.keras.Model):
             dic_size, em_dim, name="Embedding", mask_zero=True
         )
         self.lstm = tf.keras.layers.LSTM(
-            num_units,
-            activation="sigmoid",
-            recurrent_activation="sigmoid",
-            recurrent_dropout=0,
-            use_bias=True,
-            unroll=False,
-            return_state=True,
+            self.num_units,
             return_sequences=True,
+            return_state=True,
+            recurrent_initializer="glorot_uniform",
             name="LSTM",
         )
 
@@ -43,7 +40,6 @@ class Encoder(tf.keras.Model):
         """implements call from keras.Model"""
         # specify embedding input and pass in embedding in lstm layer
         em = self.embedding(inputs)
-
         output, h, c = self.lstm(em, initial_state=hidden)
         return output, h, c
 
@@ -79,7 +75,7 @@ class Decoder(tf.keras.Model):
         self.attention_mechanism = self.build_attention_mechanism(
             self.dec_units,
             None,
-            self.batch_sz * [47],
+            self.batch_sz * [47 - 1],
             self.attention_type,
         )
 
@@ -133,7 +129,7 @@ class Decoder(tf.keras.Model):
         outputs, _, _ = self.decoder(
             x,
             initial_state=initial_state,
-            sequence_length=self.batch_sz * [47],
+            sequence_length=self.batch_sz * [47 - 1],
         )
         return outputs
 
@@ -141,6 +137,7 @@ class Decoder(tf.keras.Model):
 class Translator(tf.keras.Model):
     def __init__(self, tar_dim, src_dim, em_dim, num_units, batch_size, **kwargs):
         super(Translator, self).__init__(**kwargs)
+        self.optimizer = tf.keras.optimizers.Adam()
         self.encoder = Encoder(src_dim, em_dim, num_units, batch_size)
         self.decoder = Decoder(tar_dim, em_dim, num_units, batch_size)
 
@@ -153,6 +150,8 @@ class Translator(tf.keras.Model):
         with tf.GradientTape() as tape:
             # pass input into encoder
             enc_output, h, c = self.encoder(inputs, hidden)
+            dec_input = targ[:, :-1]  # ignore 0 token
+            real = targ[:, 1:]  # ignore <s> token
 
             # attention mechanism - done
             self.decoder.attention_mechanism.setup_memory(enc_output)
@@ -162,10 +161,10 @@ class Translator(tf.keras.Model):
                 self.decoder.batch_sz, [h, c], tf.float32
             )
             # pass input into decoder
-            dec_output = self.decoder(targ, decoder_init_state)
+            dec_output = self.decoder(dec_input, decoder_init_state)
             dec_output = dec_output.rnn_output
             # targ represent the real values whilst dec_output is a softmax layer
-            loss = categorical_loss(targ, dec_output)
+            loss = categorical_loss(real, dec_output)
 
         var = self.encoder.trainable_variables + self.decoder.trainable_variables
         gradients = tape.gradient(loss, var)
@@ -207,7 +206,6 @@ def train_loop(epochs, data, batch_size, metric_rate, cp_rate):
     # initialise with embedding = 200, units = 200 and batch_size = 200
 
     model = Translator(len(dic_tar), len(dic_src), 200, 200, batch_size)
-    model.compile(optimizer="adam")
 
     # declare checkpoints
     # set cp directory rrn_checkpoints
@@ -256,10 +254,12 @@ def train_loop(epochs, data, batch_size, metric_rate, cp_rate):
         )
         print("Time taken: {} sec".format(time.time() - set_off))
 
+    return model
+
 
 def preprocess_data(en_path, de_path):
     """called from main to prepare dataset before initiating training"""
-    EPOCHS = 9
+    EPOCHS = 1
     BATCH_SZ = 200
     MET_RATE = 10
     CP_RATE = 1
@@ -289,7 +289,8 @@ def main():
     de_path = os.path.join(cur_dir, "train_data", "multi30k_subword.de")
     # batch = batches.create_batch_rnn(de_path, en_path)
     epochs, data, sz, met, cp = preprocess_data(en_path, de_path)
-    train_loop(epochs, data, sz, met, cp)
+    model = train_loop(epochs, data, sz, met, cp)
+    rnn_dec.main(model)
 
     # dataset = tf.data.Dataset(np.array(batch.source))(
     #     batch_size=200, drop_remainder=True
