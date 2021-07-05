@@ -13,6 +13,13 @@
 # Container registry reference (authenticating, etc.)
 # https://gitlab.com/help/user/packages/container_registry/index
 
+stages:
+  - build
+  - test
+  - deploy
+
+
+
 # You can define an image that’s used for all jobs, and a list 
 # of services that you want to use during runtime.
 default:
@@ -24,10 +31,6 @@ default:
   before_script:
     - docker-compose build --no-cache
 
-build-job:
-  stage: build 
-  script:
-    - echo "I am useless"
 
 test-job1:
   stage: test
