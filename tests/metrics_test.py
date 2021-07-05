@@ -7,6 +7,7 @@ import os
 import sys
 import inspect
 
+# TODO improve this
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 parentdir = os.path.dirname(currentdir)
 sys.path.insert(0, parentdir)
@@ -35,6 +36,7 @@ class TestMetrics(unittest.TestCase):
                 msg="Bleu fails when given two equal sentences at " + str(i),
             )
 
+
 """
 assertEqual(a, b) 	a == b
 
@@ -62,8 +64,6 @@ isinstance(a, b)
 
 assertNotIsInstance(a, b) 	not isinstance(a, b)
 """
-            
-
 
 
 if __name__ == "__main__":
