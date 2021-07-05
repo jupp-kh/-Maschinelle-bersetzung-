@@ -13,13 +13,6 @@
 # Container registry reference (authenticating, etc.)
 # https://gitlab.com/help/user/packages/container_registry/index
 
-stages:
-  - build
-  - test
-  - deploy
-
-
-
 # You can define an image that’s used for all jobs, and a list 
 # of services that you want to use during runtime.
 default:
