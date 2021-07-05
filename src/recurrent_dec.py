@@ -2,15 +2,18 @@
 recurrent_dec.py offers methods to compute beam search and greedy search 
 translations are made using the RNN model from recurrent_nn.py
 """
+from __future__ import print_function
 import itertools
 import math
 import os
 import multiprocessing
+from posixpath import join
 from numpy.lib.utils import source
 import tensorflow as tf
 from tensorflow.keras.backend import argmax
 from tensorflow.keras.backend import get_value
 import numpy as np
+import random
 from tensorflow.python.framework.tensor_conversion_registry import get
 from tensorflow.python.ops.gen_math_ops import mod
 from tensorflow_addons.seq2seq import decoder
@@ -103,25 +106,21 @@ def translate_line(i, source, k):
         model.decoder.rnn_cell,
         beam_width=k,
         output_layer=model.decoder.fc,
-        maximum_iterations=47,
     )
-    inference_decoder_output = tfa.seq2seq.dynamic_decode(
-        beam_instance, impute_finished=False
-    )[0]
 
-    # embedding_matrix = model.decoder.embedding.variables[0]
+    embedding_matrix = model.decoder.embedding.variables[0]
 
-    # output, _, _ = beam_instance(
-    #     embedding_matrix,
-    #     start_tokens=[0],
-    #     end_token=14,
-    #     initial_state=decoder_init_state,
-    # )
+    output, _, _ = beam_instance(
+        embedding_matrix,
+        start_tokens=[1],
+        end_token=2,
+        initial_state=decoder_init_state,
+    )
     # print("iam here")
-    # final_outputs = tf.transpose(output.predicted_ids, perm=(0, 2, 1))
-    # beam_scores = tf.transpose(output.beam_search_decoder_output.scores, perm=(0, 2, 1))
+    final_outputs = tf.transpose(output.predicted_ids, perm=(0, 2, 1))
+    beam_scores = tf.transpose(output.beam_search_decoder_output.scores, perm=(0, 2, 1))
 
-    return inference_decoder_output  # final_outputs.numpy(), beam_scores.numpy()
+    return final_outputs.numpy(), beam_scores.numpy()
 
 
 def beam_decoder(source, k):
@@ -150,7 +149,11 @@ def beam_decoder(source, k):
 
 def rnn_pred_batch(source_list, target_list):
     """returns a batch from source file by padding all sentences"""
-    source_list, _ = get_word_index(source_list, target_list)
+    for i, _ in enumerate(source_list):
+        tmp = [
+            dic_src.get_index(x) if x in dic_src.bi_dict else 3 for x in source_list[i]
+        ]
+        source_list[i] = tmp
     source_list = list(map(lambda x: [1] + list(x) + [2], source_list))
 
     # instead of maxlen=46 use max_word_in_line
@@ -161,19 +164,19 @@ def rnn_pred_batch(source_list, target_list):
 
 def get_enc_dec_paths():
     """returns encoder and decoder path as tuple"""
-    enc_path = os.path.join(cur_dir, "rnn_checkpoints", "encoder.epoch01-loss1.65.hdf5")
-    dec_path = os.path.join(cur_dir, "rnn_checkpoints", "decoder.epoch01-loss1.65.hdf5")
+    enc_path = os.path.join(cur_dir, "rnn_checkpoints", "encoder.epoch01-loss1.68.hdf5")
+    dec_path = os.path.join(cur_dir, "rnn_checkpoints", "decoder.epoch01-loss1.68.hdf5")
 
     return (enc_path, dec_path)
 
 
-def evaluate_sentence(model, sentence):
+def evaluate_sentence(sentence):
     """evals sentence"""
-    # model = get_model(sentence)[0]
+    model = get_model(sentence)[0]
 
     inputs = tf.convert_to_tensor(sentence)
     inference_batch_size = inputs.shape[0]
-    print(inputs)
+    # print(inputs)
 
     enc_start_state = [
         tf.zeros((inference_batch_size, 200)),
@@ -195,7 +198,6 @@ def evaluate_sentence(model, sentence):
         cell=model.decoder.rnn_cell,
         sampler=greedy_sampler,
         output_layer=model.decoder.fc,
-        maximum_iterations=4000,
     )
     # Setup Memory in decoder stack
     model.decoder.attention_mechanism.setup_memory(enc_out)
@@ -209,8 +211,9 @@ def evaluate_sentence(model, sentence):
     return outputs.sample_id.numpy()
 
 
-def main(model):
+def main():
     """main method"""
+    tfa.options.disable_custom_kernel()
     rnn.init_dics()
     source = read_from_file(
         os.path.join(cur_dir, "test_data", "multi30k.dev_subword.de")
@@ -220,11 +223,23 @@ def main(model):
     )
 
     inputs = rnn_pred_batch(
-        ["eine gruppe von männern lädt baum@@ wolle auf einen lastwagen ."], target
+        ["ein mann schläft in einem grünen raum auf einem sofa ."], target
     )
     keys = dic_tar.get_keys()
-    output = evaluate_sentence(model, inputs)
-    print([keys[x] for x in output])
+    print(evaluate_sentence(inputs))
+    print("done")
+
+    translated_lines = []
+    src_file = rnn_pred_batch(source, target)
+    for i, line in enumerate(src_file):
+        print(i)
+        tmp = evaluate_sentence(np.array([line]))
+        tmp = [keys[x] for x in tmp[0]]
+        translated_lines.append(" ".join(tmp[:-1]))
+        if i == 10:
+            break
+
+    print(translated_lines)
     # inputs = tf.convert_to_tensor(inputs)
     # print(inputs)
     # f, s = translate_line(1, inputs, 1)
