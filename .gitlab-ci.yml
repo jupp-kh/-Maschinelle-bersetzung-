@@ -34,16 +34,16 @@ unittest-test:
     - docker-compose run ci-series python -m unittest discover -s ./tests
 
 
-discord-report:
+discord-webhook:
   image: tmaier/docker-compose
 
   services:
     - docker:dind
 
-  stage: test
+  stage: report 
 
   before_script:
     - docker-compose build --no-cache
 
   script:
-    - docker-compose run ci-series python -m unittest discover -s ./tests
+    - bash compile_to_discord.sh "$CI_COMMIT_SHA" "$DISCORD_WEBHOOK"
