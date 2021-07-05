@@ -20,29 +20,19 @@ stages:
 
 
 
-# You can define an image that’s used for all jobs, and a list 
-# of services that you want to use during runtime.
-default:
+unittest-test:
+  except:
+    - master
+
   image: tmaier/docker-compose
 
   services:
     - docker:dind
 
+  stage: test
+
   before_script:
     - docker-compose build --no-cache
 
-
-test-job1:
-  stage: test
   script:
     - docker-compose run ci-series python -m unittest discover -s ./tests
-
-test-job2:
-  stage: test
-  script:
-      - ./compile-to-discord.sh "$CI_COMMIT_SHA" "$DISCORD_WEBHOOK"
-    artifacts:
-      paths:
-        - out
-
-
