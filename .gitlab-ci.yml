@@ -13,8 +13,6 @@
 # Container registry reference (authenticating, etc.)
 # https://gitlab.com/help/user/packages/container_registry/index
 
-#### Note: Place this file in root folder of git repository 
-
 stages:
   - build
   - test
@@ -22,24 +20,33 @@ stages:
 
 
 
-docker-development-test:
-  # Job that handles both building and testing in a single stage. This is used to test commits against
-  # all branches except master. This job combines building and testing in order to save time.
-  # Since no pushing/pulling of images is needed, no variables are defined. docker-compose.yml is setup
-  # to use a default value for the image tag when COMPOSE_TAG is not defined in the current environment.
-
-  except:
-    - master
-
+# You can define an image that’s used for all jobs, and a list 
+# of services that you want to use during runtime.
+default:
   image: tmaier/docker-compose
 
   services:
     - docker:dind
 
-  stage: test
-
   before_script:
     - docker-compose build --no-cache
 
+build-job:
+  stage: build 
+  script:
+    - echo "I am useless"
+
+test-job1:
+  stage: test
   script:
     - docker-compose run ci-series python -m unittest discover -s ./tests
+
+test-job2:
+  stage: test
+  script:
+      - ./compile-to-discord.sh "$CI_COMMIT_SHA" "$DISCORD_WEBHOOK"
+    artifacts:
+      paths:
+        - out
+
+
