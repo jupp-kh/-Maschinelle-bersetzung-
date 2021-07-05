@@ -47,4 +47,4 @@ discord-webhook:
     - docker-compose build --no-cache
 
   script:
-    - docker-compose run ci-series ./compile_to_discord.sh "$CI_COMMIT_SHA" "$DISCORD_WEBHOOK"
+    - docker-compose run ci-series compile_to_discord.sh "$CI_COMMIT_SHA" "$DISCORD_WEBHOOK"
