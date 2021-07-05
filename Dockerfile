@@ -5,3 +5,4 @@ ADD ./compile_to_discord /usr/src/gitlab-ci-series/compile_to_discord
 
 RUN chmod +x compile_to_discord
 RUN pip install -r /usr/src/gitlab-ci-series/requirements.txt
+
