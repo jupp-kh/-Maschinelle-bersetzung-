@@ -1,0 +1,58 @@
+# Environment variable readme
+# https://docs.gitlab.com/ee/ci/variables/
+
+# Predefined environment variables
+# https://docs.gitlab.com/ee/ci/variables/predefined_variables.html
+
+# Using docker images
+# https://docs.gitlab.com/ee/ci/docker/using_docker_images.html
+
+# .gitlab-ci.yml reference
+# https://docs.gitlab.com/ee/ci/yaml/
+
+# Container registry reference (authenticating, etc.)
+# https://gitlab.com/help/user/packages/container_registry/index
+
+stages:
+  - build
+  - test
+  - report
+
+
+docker-build:
+  image: tmaier/docker-compose
+
+  services:
+    - docker:dind
+  
+  stage: build
+  
+  script:
+    - docker-compose build
+
+
+
+unittest-test:
+  image: tmaier/docker-compose
+
+  services:
+    - docker:dind
+
+  stage: test
+
+  script:
+    - docker-compose run ci-series python -m unittest discover -s ./tests
+
+
+    
+
+discord-webhook:
+  image: tmaier/docker-compose
+
+  services:
+    - docker:dind
+
+  stage: report 
+
+  script:
+    - docker-compose run ci-series ./compile_to_discord.sh "$CI_COMMIT_SHA" "$DISCORD_WEBHOOK"
