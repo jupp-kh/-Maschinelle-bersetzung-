@@ -31,10 +31,17 @@ import decoder
 
 # globals sit here.
 from custom_model import (
+<<<<<<< HEAD:src/test_nn.py
     BleuCallback,
     MetricsCallback,
     WordLabelerModel,
     build_search_model,
+=======
+    MetricsCallback,
+    WordLabelerModel,
+    build_search_model,
+    ModelCheckpoint,
+>>>>>>> 60332a317c1af37fbd460f82d930e957d4cc1d67:Abgabe 3/test_nn.py
 )
 from utility import cur_dir
 
@@ -97,12 +104,16 @@ def get_callback_list(cp_freq=1, tb_vis=False, lr_frac=False, is_val=False):
         embeddings_freq=1,
     )
 
+<<<<<<< HEAD:src/test_nn.py
     callback_list = [
         call_for_metrics,
         early_stopping,
         cp_callback,
         bleu_callback,
     ]
+=======
+    callback_list = [call_for_metrics, early_stopping, cp_callback]
+>>>>>>> 60332a317c1af37fbd460f82d930e957d4cc1d67:Abgabe 3/test_nn.py
 
     if lr_frac:
         callback_list.append(learning_rate_reduction)
@@ -154,6 +165,8 @@ def train_by_fit(train_model, dataset_train, dataset_val):
         callbacks=callback_list,
         verbose=0,
         validation_data=dataset_val,
+        use_multiprocessing=True,
+        workers=7,
     )
     return history
 
@@ -204,10 +217,10 @@ def run_nn(sor_file, tar_file, val_src, val_tar, window=2, val_on_dev=False):
 
     # loading batches to dataset
     data_set = tf.data.Dataset.from_tensor_slices(output_tar)
-    dataset = tf.data.Dataset.zip((dataset, data_set)).batch(200, drop_remainder=True)
+    dataset = tf.data.Dataset.zip((dataset, data_set)).batch(2000, drop_remainder=True)
 
     # preprocessing data
-    batch_count = math.floor(batch.size / 200)
+    batch_count = math.floor(batch.size / 2000)
     batch_count_train = int(batch_count * 0.9)
     dataset.shuffle(int(batch_count * 1.1))
 
@@ -228,7 +241,7 @@ def run_nn(sor_file, tar_file, val_src, val_tar, window=2, val_on_dev=False):
     # loading batches to dataset
     val_data_set = tf.data.Dataset.from_tensor_slices(val_output_tar)
     val_dataset = tf.data.Dataset.zip((val_dataset, val_data_set)).batch(
-        200, drop_remainder=True
+        2000, drop_remainder=True
     )
 
     # run nn training with fit
@@ -281,6 +294,7 @@ def hyperparam_search(sor_file, tar_file, val_src, val_tar, window=2, val_on_dev
     """
     Starts hyperparameter search, saves best model, best params and evaluates best model
     """
+    tf.config.list_physical_devices("GPU")
     batch = Batch()
     # BUG: REQ das Label muss während das lernen immer bekannt sein. S9 Architektur in letzte VL
 
@@ -328,7 +342,7 @@ def hyperparam_search(sor_file, tar_file, val_src, val_tar, window=2, val_on_dev
 
     # loading batches to dataset
     data_set = tf.data.Dataset.from_tensor_slices(output_tar)
-    dataset = tf.data.Dataset.zip((dataset, data_set)).batch(200, drop_remainder=True)
+    dataset = tf.data.Dataset.zip((dataset, data_set)).batch(2000, drop_remainder=True)
 
     #### validation data preprocessing
     val_batch = get_all_batches(val_source, val_target, window)
@@ -344,11 +358,11 @@ def hyperparam_search(sor_file, tar_file, val_src, val_tar, window=2, val_on_dev
     # loading batches to dataset
     val_data_set = tf.data.Dataset.from_tensor_slices(val_output_tar)
     val_dataset = tf.data.Dataset.zip((val_dataset, val_data_set)).batch(
-        200, drop_remainder=True
+        2000, drop_remainder=True
     )
 
     # preprocessing data
-    batch_count = math.floor(batch.size / 200)
+    batch_count = math.floor(batch.size / 2000)
     batch_count_train = int(batch_count * 0.9)
     dataset.shuffle(int(batch_count * 1.1))
 
@@ -388,8 +402,6 @@ def integrate_gpu():
     """
     Method to check whether gpu should remain integrated
     """
-    if not _LOCAL_DEVICES:
-        os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 
 def main():
@@ -405,7 +417,11 @@ def main():
         len(tf.config.experimental.list_physical_devices("GPU")),
         "\n" + "-" * 50,
     )
+<<<<<<< HEAD:src/test_nn.py
     if not (sys.argv[11].lower() == "true"):
+=======
+    if sys.argv[11].lower() == "true":
+>>>>>>> 60332a317c1af37fbd460f82d930e957d4cc1d67:Abgabe 3/test_nn.py
         integrate_gpu()
 
     # running BPE with 7k operations on dev text

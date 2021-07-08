@@ -63,7 +63,7 @@ class Decoder(tf.keras.Model):
         self.embedding = tf.keras.layers.Embedding(vocab_size, embedding_dim)
 
         # Final Dense layer on which softmax will be applied
-        self.fc = tf.keras.layers.Dense(vocab_size)
+        self.softmax = tf.keras.layers.Dense(vocab_size, activation="softmax")
 
         # Define the fundamental cell for decoder recurrent structure
         self.decoder_rnn_cell = tf.keras.layers.LSTMCell(self.dec_units)
@@ -84,10 +84,11 @@ class Decoder(tf.keras.Model):
 
         # Define the decoder with respect to fundamental rnn cell
         self.decoder = tfa.seq2seq.BasicDecoder(
-            self.rnn_cell, sampler=self.sampler, output_layer=self.fc
+            self.rnn_cell, sampler=self.sampler, output_layer=self.softmax
         )
 
-    def build_rnn_cell(self, batch_sz):
+    def build_rnn_cell(self):
+        """called to build self.rnn_cell"""
         rnn_cell = tfa.seq2seq.AttentionWrapper(
             self.decoder_rnn_cell,
             self.attention_mechanism,
@@ -98,11 +99,10 @@ class Decoder(tf.keras.Model):
     def build_attention_mechanism(
         self, dec_units, memory, memory_sequence_length, attention_type="luong"
     ):
-        # ------------- #
-        # typ: Which sort of attention (Bahdanau, Luong)
-        # dec_units: final dimension of attention outputs
-        # memory: encoder hidden states of shape (batch_size, 47, enc_units)
-        # memory_sequence_length: 1d array of shape (batch_size) with every element set to 47 (for masking purpose)
+        """attention type: Which sort of attention (Bahdanau, Luong)
+        dec_units: dimension of attention outputs
+        memory: not tweaked yet!
+        memory_sequence_length: 1d array of shape (batch_size) with every element set to 47"""
 
         if attention_type == "bahdanau":
             return tfa.seq2seq.BahdanauAttention(
@@ -118,6 +118,7 @@ class Decoder(tf.keras.Model):
             )
 
     def build_initial_state(self, batch_sz, encoder_state, Dtype):
+        """initializes rnn_cell """
         decoder_initial_state = self.rnn_cell.get_initial_state(
             batch_size=batch_sz, dtype=Dtype
         )
