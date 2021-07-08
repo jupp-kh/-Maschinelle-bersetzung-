@@ -1,8 +1,6 @@
 version: '3.7'
 
-# this file ensures an image is created from the Dockerfile
-# the defined ci-series service creates a container from the 
-#   given image we specify for the runner.
+# this file creates the container using the image specified
 
 services:
   ci-series:

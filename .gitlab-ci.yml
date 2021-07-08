@@ -14,8 +14,21 @@
 # https://gitlab.com/help/user/packages/container_registry/index
 
 stages:
+  - build
   - test
   - report
+
+
+docker-build:
+  image: tmaier/docker-compose
+
+  services:
+    - docker:dind
+  
+  stage: build
+  
+  script:
+    - docker-compose build
 
 
 
@@ -26,9 +39,6 @@ unittest-test:
     - docker:dind
 
   stage: test
-
-  before_script:
-    - docker-compose build --no-cache
 
   script:
     - docker-compose run ci-series python -m unittest discover -s ./tests
@@ -42,9 +52,6 @@ discord-webhook:
     - docker:dind
 
   stage: report 
-
-  before_script:
-    - docker-compose build --no-cache
 
   script:
     - docker-compose run ci-series ./compile_to_discord.sh "$CI_COMMIT_SHA" "$DISCORD_WEBHOOK"
