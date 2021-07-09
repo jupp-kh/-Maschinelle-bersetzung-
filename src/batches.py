@@ -306,14 +306,14 @@ def create_batch_rnn(source, target):
                 [dic_src.get_index("<s>")]
                 + s
                 + [dic_src.get_index("</s>")]
-                + [0 for _ in range(max_line - len(s) + 1)]
+                + [0 for _ in range(max_line - len(s))]
             )
         )
         batch.append_t(
             [dic_tar.get_index("<s>")]
             + t
             + [dic_tar.get_index("</s>")]
-            + [0 for _ in range(max_line - len(t))]
+            + [0 for _ in range(max_line - len(t) + 1)]
         )
         batch.append_l(
             t

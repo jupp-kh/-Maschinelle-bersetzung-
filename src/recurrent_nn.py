@@ -4,9 +4,8 @@ includes the rnn model
 import time
 import numpy as np
 import os
-from keras.layers import Dense
 import tensorflow as tf
-from tensorflow._api.v2 import train
+from tensorflow.python.eager.context import context
 from dictionary import dic_tar, dic_src
 from utility import cur_dir
 import batches
@@ -18,6 +17,37 @@ import recurrent_dec as rnn_dec
 
 # import config file for hyperparameter search space
 # import config_custom_train as config
+
+
+class BahdanauAttention(tf.keras.layers.Layer):
+    def __init__(self, units):
+        super(BahdanauAttention, self).__init__()
+
+        # layers of bahdanau attention
+        self.l1 = tf.keras.layers.Dense(units)
+        self.l2 = tf.keras.layers.Dense(units)
+        self.attention = tf.keras.layers.AdditiveAttention(units)
+        # self.one_dim = tf.keras.layers.Dense(1)
+
+    def call(self, dec_query, enc_values):
+        """dec_query: output generated from the lstm layer of decoder
+        enc_value: output of the encoder"""
+        dec_query_dense = self.l1(dec_query)
+        enc_values_dense = self.l2(enc_values)
+        context_vector, attention_weights = self.attention(
+            inputs=[dec_query_dense, dec_query, enc_values_dense],
+            return_attention_scores=True,
+        )
+        # score = self.one_dim(tf.nn.tanh(self.l1(dec_query) + self.l2(enc_values)))
+        # normalise score vector to obtain the attention weights denoted as alpha_i
+        # attention_weights = tf.nn.softmax(score, axis=1)
+        # context vector is equivalent to the
+        # sum_{1 to len(attention_weights)} alpha_i * x_i (encoder output)
+        # context_vector = attention_weights * enc_values
+        # context_vector = tf.reduce_sum(context_vector, axis=1)
+        # context_vector = tf.expand_dims(context_vector, 1)
+        # reduce sum sums over all input points
+        return context_vector, attention_weights
 
 
 class Encoder(tf.keras.Model):
@@ -35,6 +65,8 @@ class Encoder(tf.keras.Model):
             recurrent_initializer="glorot_uniform",
             name="LSTM",
         )
+
+        self.bidirect = tf.keras.layers.Bidirectional(self.lstm, merge_mode="sum")
 
     def call(self, inputs, hidden):
         """implements call from keras.Model"""
@@ -59,78 +91,47 @@ class Decoder(tf.keras.Model):
         self.dec_units = dec_units
         self.attention_type = attention_type
 
-        # Embedding Layer
+        # Embedding Layer to reduce input size
         self.embedding = tf.keras.layers.Embedding(vocab_size, embedding_dim)
 
-        # Final Dense layer on which softmax will be applied
-        self.fc = tf.keras.layers.Dense(vocab_size)
-
         # Define the fundamental cell for decoder recurrent structure
-        self.decoder_rnn_cell = tf.keras.layers.LSTMCell(self.dec_units)
-
-        # Sampler
-        self.sampler = tfa.seq2seq.sampler.TrainingSampler()
+        self.lstm = tf.keras.layers.LSTM(
+            self.dec_units, return_sequences=True, return_state=True
+        )
 
         # Create attention mechanism with memory = None
-        self.attention_mechanism = self.build_attention_mechanism(
-            self.dec_units,
-            None,
-            self.batch_sz * [47 - 1],
-            self.attention_type,
+        self.attention_mechanism = BahdanauAttention(self.dec_units)
+
+        # combine the rnn output and the context vector to generate attention vector
+        self.vector = tf.keras.layers.Dense(
+            self.dec_units, activation="tanh", use_bias=False
         )
 
-        # Wrap attention mechanism with the fundamental rnn cell of decoder
-        self.rnn_cell = self.build_rnn_cell(batch_sz)
-
-        # Define the decoder with respect to fundamental rnn cell
-        self.decoder = tfa.seq2seq.BasicDecoder(
-            self.rnn_cell, sampler=self.sampler, output_layer=self.fc
-        )
-
-    def build_rnn_cell(self, batch_sz):
-        rnn_cell = tfa.seq2seq.AttentionWrapper(
-            self.decoder_rnn_cell,
-            self.attention_mechanism,
-            attention_layer_size=self.dec_units,
-        )
-        return rnn_cell
-
-    def build_attention_mechanism(
-        self, dec_units, memory, memory_sequence_length, attention_type="luong"
-    ):
-        # ------------- #
-        # typ: Which sort of attention (Bahdanau, Luong)
-        # dec_units: final dimension of attention outputs
-        # memory: encoder hidden states of shape (batch_size, 47, enc_units)
-        # memory_sequence_length: 1d array of shape (batch_size) with every element set to 47 (for masking purpose)
-
-        if attention_type == "bahdanau":
-            return tfa.seq2seq.BahdanauAttention(
-                units=dec_units,
-                memory=memory,
-                memory_sequence_length=memory_sequence_length,
-            )
-        else:
-            return tfa.seq2seq.LuongAttention(
-                units=dec_units,
-                memory=memory,
-                memory_sequence_length=memory_sequence_length,
-            )
-
-    def build_initial_state(self, batch_sz, encoder_state, Dtype):
-        decoder_initial_state = self.rnn_cell.get_initial_state(
-            batch_size=batch_sz, dtype=Dtype
-        )
-        decoder_initial_state = decoder_initial_state.clone(cell_state=encoder_state)
-        return decoder_initial_state
+        # Final Dense layer on which softmax will be applied
+        self.softmax = tf.keras.layers.Dense(vocab_size, activation="softmax")
 
     def call(self, inputs, initial_state):
-        x = self.embedding(inputs)
-        outputs, _, _ = self.decoder(
-            x,
-            initial_state=initial_state,
-            sequence_length=self.batch_sz * [47 - 1],
+        # initial_state should be of size: (batch size, units)
+        # send through embedding layer
+        inp, enc_output = inputs
+        x = self.embedding(inp)
+
+        # process one step with LSTM
+        outputs, _, _ = self.lstm(x, initial_state=initial_state)
+
+        # use the outputs variable for the attention over encoder's output
+        # dec_query: output from decoder's lstm layer, enc_values: output from encoder's lstm layer
+        context, weights = self.attention_mechanism(
+            dec_query=outputs, enc_values=enc_output
         )
+
+        # concatenate the outputs of lstm and the generated context vector
+
+        rnn_context = tf.concat([context, outputs], axis=-1)
+        attention_vector = self.vector(rnn_context)
+
+        # final output layer - applying softmax
+        outputs = self.softmax(attention_vector)
         return outputs
 
 
@@ -144,25 +145,20 @@ class Translator(tf.keras.Model):
     def train_step(self, inputs, hidden):
         """implements train_step from Model"""
         inputs, targ = inputs  # split input from Dataset
+
         # print(inputs.shape, targ.shape)
         loss = 0
 
         with tf.GradientTape() as tape:
             # pass input into encoder
-            enc_output, h, c = self.encoder(inputs, hidden)
+            # enc_output: whole_sequence_output, h: final_mem_state, c: final_cell_state
+            enc_output, h, c = self.encoder(inputs, None)
             dec_input = targ[:, :-1]  # ignore 0 token
             real = targ[:, 1:]  # ignore <s> token
 
-            # attention mechanism - done
-            self.decoder.attention_mechanism.setup_memory(enc_output)
-
-            # initialise AttentionWrapper state as initial state for decoder
-            decoder_init_state = self.decoder.build_initial_state(
-                self.decoder.batch_sz, [h, c], tf.float32
-            )
             # pass input into decoder
-            dec_output = self.decoder(dec_input, decoder_init_state)
-            dec_output = dec_output.rnn_output
+            dec_output = self.decoder((dec_input, enc_output), None)
+
             # targ represent the real values whilst dec_output is a softmax layer
             loss = categorical_loss(real, dec_output)
 
@@ -183,11 +179,11 @@ def init_dics():
 
 
 def categorical_loss(real, pred):
-    """computes and returns categorical cross entropy"""
+    """computes and returns sparse categorical cross entropy"""
     # print(real.shape, pred.shape)
 
     entropy = tf.keras.losses.SparseCategoricalCrossentropy(
-        from_logits=True, reduction="none"
+        from_logits=False, reduction="none"
     )(real, pred)
     # mask unnecessary symbols
     mask = tf.logical_not(tf.math.equal(real, 0))
@@ -198,6 +194,16 @@ def categorical_loss(real, pred):
     # print(tf.keras.backend.get_value(entropy))
     # compute the mean of elements across dimensions of entropy
     return tf.reduce_mean(entropy)
+
+
+def perplexity(loss):
+    """computes and returns perplexity"""
+    return tf.keras.backend.exp(loss)
+
+
+def accuracy():
+    """computes and returns accuracy"""
+    pass
 
 
 # epochs, batch_size, metrics_rate and cp_rate should be flexible parameters
@@ -222,12 +228,16 @@ def train_loop(epochs, data, batch_size, metric_rate, cp_rate):
             loss += b_loss
 
             if i % metric_rate == 0:
+                val = tf.keras.backend.get_value(b_loss)
+                per = perplexity(val)
+
                 print(
-                    "Epoch: {}, Batch: {}, Loss: {:.2f}".format(
-                        epoch + 1, i, tf.keras.backend.get_value(b_loss)
+                    "Epoch: {}, Batch: {}, Loss: {:.2f}, Per: {:.2f}".format(
+                        epoch + 1, i, val, per
                     )
                 )
 
+        # saving checkpoints
         if (epoch + 1) % cp_rate == 0:
             model.encoder.save_weights(  # saving encoder weights
                 os.path.join(
