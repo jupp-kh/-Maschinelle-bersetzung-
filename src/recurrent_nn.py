@@ -24,9 +24,9 @@ class BahdanauAttention(tf.keras.layers.Layer):
         super(BahdanauAttention, self).__init__()
 
         # layers of bahdanau attention
-        self.l1 = tf.keras.layers.Dense(units)
-        self.l2 = tf.keras.layers.Dense(units)
-        self.attention = tf.keras.layers.AdditiveAttention(units)
+        self.l1 = tf.keras.layers.Dense(units, use_bias=False)
+        self.l2 = tf.keras.layers.Dense(units, use_bias=False)
+        self.attention = tf.keras.layers.AdditiveAttention()
         # self.one_dim = tf.keras.layers.Dense(1)
 
     def call(self, dec_query, enc_values):
@@ -34,8 +34,11 @@ class BahdanauAttention(tf.keras.layers.Layer):
         enc_value: output of the encoder"""
         dec_query_dense = self.l1(dec_query)
         enc_values_dense = self.l2(enc_values)
+        dec_query_mask = tf.ones(tf.shape(dec_query)[:-1], dtype=bool)
+        enc_value_mask = ((enc_values != 0).shape,)
         context_vector, attention_weights = self.attention(
-            inputs=[dec_query_dense, dec_query, enc_values_dense],
+            inputs=[dec_query_dense, enc_values, enc_values_dense],
+            mask=[dec_query_mask, enc_value_mask],
             return_attention_scores=True,
         )
         # score = self.one_dim(tf.nn.tanh(self.l1(dec_query) + self.l2(enc_values)))
@@ -55,30 +58,53 @@ class Encoder(tf.keras.Model):
         super(Encoder, self).__init__(**kwargs)
         self.batch_size = batch_size
         self.num_units = num_units
-        self.embedding = tf.keras.layers.Embedding(
-            dic_size, em_dim, name="Embedding", mask_zero=True
-        )
-        self.lstm = tf.keras.layers.LSTM(
+        self.embedding = tf.keras.layers.Embedding(dic_size, em_dim, name="Embedding")
+
+        # The GRU RNN layer processes those vectors sequentially.
+        self.gru = tf.keras.layers.GRU(
             self.num_units,
+            # Return the sequence and state
             return_sequences=True,
             return_state=True,
             recurrent_initializer="glorot_uniform",
-            name="LSTM",
         )
 
-        self.bidirect = tf.keras.layers.Bidirectional(self.lstm, merge_mode="sum")
+        self.lstm_forward = tf.keras.layers.LSTM(
+            self.num_units,
+            return_sequences=True,
+            return_state=True,
+            name="LSTM_forward",
+        )
 
-    def call(self, inputs, hidden):
+        self.lstm_backward = tf.keras.layers.LSTM(
+            self.num_units,
+            return_sequences=True,
+            return_state=True,
+            go_backwards=True,
+            name="LSTM_backword",
+        )
+
+        self.bidirect = tf.keras.layers.Bidirectional(
+            self.lstm_forward, backward_layer=self.lstm_backward, merge_mode="sum"
+        )
+
+    def call(self, inputs, hidden=None):
         """implements call from keras.Model"""
         # specify embedding input and pass in embedding in lstm layer
         em = self.embedding(inputs)
-        output, h, c = self.lstm(em, initial_state=hidden)
-        return output, h, c
+        output, state = self.gru(em, initial_state=hidden)
+        return output, state
 
     def initialize_hidden_state(self):
         return [
-            tf.zeros((self.batch_size, self.num_units)),
-            tf.zeros((self.batch_size, self.num_units)),
+            [
+                tf.zeros((self.batch_size, self.num_units)),
+                tf.zeros((self.batch_size, self.num_units)),
+            ],
+            [
+                tf.zeros((self.batch_size, self.num_units)),
+                tf.zeros((self.batch_size, self.num_units)),
+            ],
         ]
 
 
@@ -95,8 +121,11 @@ class Decoder(tf.keras.Model):
         self.embedding = tf.keras.layers.Embedding(vocab_size, embedding_dim)
 
         # Define the fundamental cell for decoder recurrent structure
-        self.lstm = tf.keras.layers.LSTM(
-            self.dec_units, return_sequences=True, return_state=True
+        self.gru = tf.keras.layers.GRU(
+            self.dec_units,
+            return_sequences=True,
+            return_state=True,
+            recurrent_initializer="glorot_uniform",
         )
 
         # Create attention mechanism with memory = None
@@ -110,14 +139,14 @@ class Decoder(tf.keras.Model):
         # Final Dense layer on which softmax will be applied
         self.softmax = tf.keras.layers.Dense(vocab_size, activation="softmax")
 
-    def call(self, inputs, initial_state):
+    def call(self, inputs, initial_state=None):
         # initial_state should be of size: (batch size, units)
         # send through embedding layer
         inp, enc_output = inputs
         x = self.embedding(inp)
 
         # process one step with LSTM
-        outputs, _, _ = self.lstm(x, initial_state=initial_state)
+        outputs, state = self.gru(x, initial_state=initial_state)
 
         # use the outputs variable for the attention over encoder's output
         # dec_query: output from decoder's lstm layer, enc_values: output from encoder's lstm layer
@@ -132,7 +161,8 @@ class Decoder(tf.keras.Model):
 
         # final output layer - applying softmax
         outputs = self.softmax(attention_vector)
-        return outputs
+
+        return outputs, weights, state
 
 
 class Translator(tf.keras.Model):
@@ -152,7 +182,7 @@ class Translator(tf.keras.Model):
         with tf.GradientTape() as tape:
             # pass input into encoder
             # enc_output: whole_sequence_output, h: final_mem_state, c: final_cell_state
-            enc_output, h, c = self.encoder(inputs, None)
+            enc_output, h, c = self.encoder(inputs, hidden)
             dec_input = targ[:, :-1]  # ignore 0 token
             real = targ[:, 1:]  # ignore <s> token
 
@@ -269,11 +299,10 @@ def train_loop(epochs, data, batch_size, metric_rate, cp_rate):
 
 def preprocess_data(en_path, de_path):
     """called from main to prepare dataset before initiating training"""
-    EPOCHS = 1
+    EPOCHS = 15
     BATCH_SZ = 200
-    MET_RATE = 10
-    CP_RATE = 1
-
+    MET_RATE = 30
+    CP_RATE = 15
     # prepare dataset
     data = batches.create_batch_rnn(de_path, en_path)
 
@@ -300,7 +329,6 @@ def main():
     # batch = batches.create_batch_rnn(de_path, en_path)
     epochs, data, sz, met, cp = preprocess_data(en_path, de_path)
     model = train_loop(epochs, data, sz, met, cp)
-    rnn_dec.main(model)
 
     # dataset = tf.data.Dataset(np.array(batch.source))(
     #     batch_size=200, drop_remainder=True
