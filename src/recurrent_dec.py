@@ -51,20 +51,21 @@ def roll_out_encoder(sentence, batch_size=1):
     test_model = rnn.Translator(len(dic_tar), len(dic_src), 200, 200, batch_size)
     dec_input = [[dic_src.bi_dict["<s>"]] + [0 for _ in range(len(sentence[0]) - 1)]]
     dec_input = np.array(dec_input)
-    enc_output, _, _ = test_model.encoder(sentence, None)
+    enc_output, _ = test_model.encoder(sentence, None)
 
-    dec_output = test_model.decoder((dec_input, enc_output), None)
+    dec_output, weights, state = test_model.decoder((dec_input, enc_output), None)
 
+    print(test_model.decoder.trainable_variables)
     test_model.encoder.load_weights(enc)
     test_model.decoder.load_weights(dec)
 
     return test_model, enc_output, dec_output
 
 
-def translate_sentence(sentence, k=3):
+def translate_sentence(sentence, k=1):
     """translates sentence using beam search algorithm"""
     model, enc_output, dec_output = roll_out_encoder(sentence)
-    first_pred = tf.math.top_k(dec_output, k=3)
+    first_pred = tf.math.top_k(dec_output, k)
 
     candidate_sentences = []
     for i in range(k):
@@ -84,7 +85,7 @@ def translate_sentence(sentence, k=3):
             pre_sentence = tf.keras.preprocessing.sequence.pad_sequences(
                 [pre_pred_word], maxlen=47, value=0, padding="post"
             )
-            pred_word = model.decoder((pre_sentence, enc_output))
+            pred_word, _, _ = model.decoder((pre_sentence, enc_output))
             k_best = tf.math.top_k(pred_word, k=k)
             seq, score = candidate_sentences[j]
             for x, _ in enumerate(k_best):
@@ -95,7 +96,9 @@ def translate_sentence(sentence, k=3):
                 all_candidates.append(candidate)
         ordered = sorted(all_candidates, key=lambda tup: tup[1])
         candidate_sentences = ordered[:k]
-    print_sentence(candidate_sentences[0][0])
+
+    for sen in candidate_sentences:
+        print_sentence(sen[0])
 
 
 def rnn_pred_batch(source_list):
@@ -130,8 +133,8 @@ def print_sentence(pred):
 
 def get_enc_dec_paths():
     """returns encoder and decoder path as tuple"""
-    enc_path = os.path.join(cur_dir, "rnn_checkpoints", "encoder.epoch15-loss0.16.hdf5")
-    dec_path = os.path.join(cur_dir, "rnn_checkpoints", "decoder.epoch15-loss0.16.hdf5")
+    enc_path = os.path.join(cur_dir, "rnn_checkpoints", "encoder.epoch04-loss1.58.hdf5")
+    dec_path = os.path.join(cur_dir, "rnn_checkpoints", "decoder.epoch04-loss1.58.hdf5")
 
     return (enc_path, dec_path)
 
@@ -147,8 +150,8 @@ def main():
     )
 
     inputs = rnn_pred_batch(["ein mann schläft in einem grünen raum auf einem sofa ."])
-    for i in range(10):
-        translate_sentence(inputs)
+
+    translate_sentence(inputs, k=3)
 
     # inputs = tf.convert_to_tensor(inputs)
     # print(inputs)
