@@ -51,13 +51,17 @@ def roll_out_encoder(sentence, batch_size=1):
     test_model = rnn.Translator(len(dic_tar), len(dic_src), 200, 200, batch_size)
     dec_input = [[dic_src.bi_dict["<s>"]] + [0 for _ in range(len(sentence[0]) - 1)]]
     dec_input = np.array(dec_input)
-    enc_output, _ = test_model.encoder(sentence, None)
+    temp = tf.zeros(dec_input.shape, dtype=tf.float32)
 
-    dec_output, weights, state = test_model.decoder((dec_input, enc_output), None)
+    enc_output, _ = test_model.encoder(temp, None)
 
-    print(test_model.decoder.trainable_variables)
+    dec_output, weights, state = test_model.decoder((temp, enc_output), None)
+
     test_model.encoder.load_weights(enc)
     test_model.decoder.load_weights(dec)
+
+    enc_output, _ = test_model.encoder(sentence, None)
+    dec_output, weights, state = test_model.decoder((dec_input, enc_output), None)
 
     return test_model, enc_output, dec_output
 
@@ -71,7 +75,7 @@ def translate_sentence(sentence, k=1):
     for i in range(k):
         candidate_sentences.append(
             [
-                [get_value(first_pred.indices[0][0][i])],
+                [dic_tar.bi_dict["<s>"], get_value(first_pred.indices[0][0][i])],
                 -math.log(get_value(first_pred.values[0][0][i])),
             ]
         )
@@ -133,8 +137,8 @@ def print_sentence(pred):
 
 def get_enc_dec_paths():
     """returns encoder and decoder path as tuple"""
-    enc_path = os.path.join(cur_dir, "rnn_checkpoints", "encoder.epoch04-loss1.58.hdf5")
-    dec_path = os.path.join(cur_dir, "rnn_checkpoints", "decoder.epoch04-loss1.58.hdf5")
+    enc_path = os.path.join(cur_dir, "rnn_checkpoints", "encoder.epoch12-loss0.42.hdf5")
+    dec_path = os.path.join(cur_dir, "rnn_checkpoints", "decoder.epoch12-loss0.42.hdf5")
 
     return (enc_path, dec_path)
 
