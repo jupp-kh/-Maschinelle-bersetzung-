@@ -26,7 +26,7 @@ class BahdanauAttention(tf.keras.layers.Layer):
         # layers of bahdanau attention
         self.l1 = tf.keras.layers.Dense(units, use_bias=False)
         self.l2 = tf.keras.layers.Dense(units, use_bias=False)
-        self.attention = tf.keras.layers.AdditiveAttention()
+        self.attention = tf.keras.layers.AdditiveAttention(dropout=0.2)
         # self.one_dim = tf.keras.layers.Dense(1)
 
     def call(self, dec_query, enc_values):
@@ -34,13 +34,13 @@ class BahdanauAttention(tf.keras.layers.Layer):
         enc_value: output of the encoder"""
         dec_query_dense = self.l1(dec_query)
         enc_values_dense = self.l2(enc_values)
-        dec_query_mask = tf.ones(tf.shape(dec_query)[:-1], dtype=bool)
-        enc_value_mask = ((enc_values != 0).shape,)
+
+        # print(enc_values_dense.shape, enc_values.shape, dec_query_dense.shape)
         context_vector, attention_weights = self.attention(
             inputs=[dec_query_dense, enc_values, enc_values_dense],
-            mask=[dec_query_mask, enc_value_mask],
             return_attention_scores=True,
         )
+        # print("done")
         # score = self.one_dim(tf.nn.tanh(self.l1(dec_query) + self.l2(enc_values)))
         # normalise score vector to obtain the attention weights denoted as alpha_i
         # attention_weights = tf.nn.softmax(score, axis=1)
@@ -182,12 +182,13 @@ class Translator(tf.keras.Model):
         with tf.GradientTape() as tape:
             # pass input into encoder
             # enc_output: whole_sequence_output, h: final_mem_state, c: final_cell_state
-            enc_output, h, c = self.encoder(inputs, hidden)
+            enc_output, state = self.encoder(inputs, None)
             dec_input = targ[:, :-1]  # ignore 0 token
             real = targ[:, 1:]  # ignore <s> token
 
             # pass input into decoder
-            dec_output = self.decoder((dec_input, enc_output), None)
+            dec_output, weights, state = self.decoder((dec_input, enc_output), None)
+            # print(real.shape, dec_output.shape)
 
             # targ represent the real values whilst dec_output is a softmax layer
             loss = categorical_loss(real, dec_output)
