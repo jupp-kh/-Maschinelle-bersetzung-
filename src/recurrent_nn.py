@@ -18,6 +18,8 @@ import recurrent_dec as rnn_dec
 # import config file for hyperparameter search space
 # import config_custom_train as config
 
+max_line = 0
+
 
 class BahdanauAttention(tf.keras.layers.Layer):
     def __init__(self, units):
@@ -61,11 +63,19 @@ class Encoder(tf.keras.Model):
         self.embedding = tf.keras.layers.Embedding(dic_size, em_dim, name="Embedding")
 
         # The GRU RNN layer processes those vectors sequentially.
-        self.gru = tf.keras.layers.GRU(
+        self.gru_forward = tf.keras.layers.GRU(
             self.num_units,
             # Return the sequence and state
             return_sequences=True,
             return_state=True,
+            recurrent_initializer="glorot_uniform",
+        )
+        self.gru_backward = tf.keras.layers.GRU(
+            self.num_units,
+            # Return the sequence and state
+            return_sequences=True,
+            return_state=True,
+            go_backwards=True,
             recurrent_initializer="glorot_uniform",
         )
 
@@ -84,15 +94,18 @@ class Encoder(tf.keras.Model):
             name="LSTM_backword",
         )
 
-        self.bidirect = tf.keras.layers.Bidirectional(
+        self.bidirect_lstm = tf.keras.layers.Bidirectional(
             self.lstm_forward, backward_layer=self.lstm_backward, merge_mode="sum"
+        )
+        self.bidirect_gru = tf.keras.layers.Bidirectional(
+            self.gru_forward, backward_layer=self.gru_backward, merge_mode="sum"
         )
 
     def call(self, inputs, hidden=None):
         """implements call from keras.Model"""
         # specify embedding input and pass in embedding in lstm layer
         em = self.embedding(inputs)
-        output, state = self.gru(em, initial_state=hidden)
+        output, _, state = self.bidirect_gru(em, initial_state=hidden)
         return output, state
 
     def initialize_hidden_state(self):
@@ -169,6 +182,7 @@ class Translator(tf.keras.Model):
     def __init__(self, tar_dim, src_dim, em_dim, num_units, batch_size, **kwargs):
         super(Translator, self).__init__(**kwargs)
         self.optimizer = tf.keras.optimizers.Adam()
+        self.accuracy = tf.keras.metrics.Accuracy()
         self.encoder = Encoder(src_dim, em_dim, num_units, batch_size)
         self.decoder = Decoder(tar_dim, em_dim, num_units, batch_size)
 
@@ -242,8 +256,11 @@ def train_loop(epochs, data, batch_size, metric_rate, cp_rate):
     """method for RNN train step"""
     # initialise with embedding = 200, units = 200 and batch_size = 200
 
-    model = Translator(len(dic_tar), len(dic_src), 200, 200, batch_size)
+    # TODO distinguish between load model or init model und change the check point naming conventions!!
 
+    # model = Translator(len(dic_tar), len(dic_src), 200, 200, batch_size)
+    temp = tf.zeros((batch_size, 47))
+    model, _, _ = rnn_dec.roll_out_encoder(None, False, batch_size)
     # declare checkpoints
     # set cp directory rrn_checkpoints
     CHECKPOINT_DIR = os.path.join(cur_dir, "rnn_checkpoints")
@@ -300,12 +317,13 @@ def train_loop(epochs, data, batch_size, metric_rate, cp_rate):
 
 def preprocess_data(en_path, de_path):
     """called from main to prepare dataset before initiating training"""
-    EPOCHS = 15
+    EPOCHS = 9
     BATCH_SZ = 200
     MET_RATE = 30
-    CP_RATE = 15
+    CP_RATE = 3
     # prepare dataset
-    data = batches.create_batch_rnn(de_path, en_path)
+    global max_line
+    max_line, data = batches.create_batch_rnn(de_path, en_path)
 
     tarset = tf.data.Dataset.from_tensor_slices(np.array(data.target))
     data = tf.data.Dataset.from_tensor_slices(np.array(data.source))
@@ -342,5 +360,18 @@ def main():
     print("\n Result: ok!")  # ok?
 
 
+def test():
+    init_dics()
+    # encoder = Encoder(len(dic_src), 200, 200, 200)
+    # decoder = Decoder(len(dic_tar), 200, 200, 200)
+
+    en_path = os.path.join(cur_dir, "train_data", "multi30k_subword.en")
+    de_path = os.path.join(cur_dir, "train_data", "multi30k_subword.de")
+    # batch = batches.create_batch_rnn(de_path, en_path)
+    epochs, data, sz, met, cp = preprocess_data(en_path, de_path)
+    print(max_line)
+
+
 if __name__ == "__main__":
     main()
+    # test()

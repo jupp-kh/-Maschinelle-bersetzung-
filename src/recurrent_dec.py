@@ -16,6 +16,10 @@ import tensorflow_addons as tfa
 from tensorflow.keras.backend import argmax
 from tensorflow.keras.backend import get_value
 
+# TODO create pool to translate the hole dev file
+
+# TODO automate the blue metric and print it.
+
 
 def save_k_txt(file_txt, k):
     """provided an integer k and encoded text saves beam predictions into file system"""
@@ -45,13 +49,13 @@ def save_k_txt(file_txt, k):
         )
 
 
-def roll_out_encoder(sentence, batch_size=1):
+def roll_out_encoder(sentence, search=True, batch_size=1):
     """builds and returns a model from model's path"""
     enc, dec = get_enc_dec_paths()
     test_model = rnn.Translator(len(dic_tar), len(dic_src), 200, 200, batch_size)
-    dec_input = [[dic_src.bi_dict["<s>"]] + [0 for _ in range(len(sentence[0]) - 1)]]
+    dec_input = [[dic_src.bi_dict["<s>"]] + [0 for _ in range(rnn.max_line - 1)]]
     dec_input = np.array(dec_input)
-    temp = tf.zeros(dec_input.shape, dtype=tf.float32)
+    temp = tf.zeros((batch_size, dec_input.shape[1]), dtype=tf.float32)
 
     enc_output, _ = test_model.encoder(temp, None)
 
@@ -59,9 +63,9 @@ def roll_out_encoder(sentence, batch_size=1):
 
     test_model.encoder.load_weights(enc)
     test_model.decoder.load_weights(dec)
-
-    enc_output, _ = test_model.encoder(sentence, None)
-    dec_output, weights, state = test_model.decoder((dec_input, enc_output), None)
+    if search:
+        enc_output, _ = test_model.encoder(sentence, None)
+        dec_output, weights, state = test_model.decoder((dec_input, enc_output), None)
 
     return test_model, enc_output, dec_output
 
@@ -70,7 +74,7 @@ def translate_sentence(sentence, k=1):
     """translates sentence using beam search algorithm"""
     model, enc_output, dec_output = roll_out_encoder(sentence)
     first_pred = tf.math.top_k(dec_output, k)
-
+    # TODO cut the search when end sequence appears in different sentence
     candidate_sentences = []
     for i in range(k):
         candidate_sentences.append(
@@ -85,12 +89,14 @@ def translate_sentence(sentence, k=1):
         all_candidates = []
         for j, _ in enumerate(candidate_sentences):
             pre_pred_word = candidate_sentences[j][0]
-            # TODO bearbeite pre word
+
             pre_sentence = tf.keras.preprocessing.sequence.pad_sequences(
                 [pre_pred_word], maxlen=47, value=0, padding="post"
             )
             pred_word, _, _ = model.decoder((pre_sentence, enc_output))
+
             k_best = tf.math.top_k(pred_word, k=k)
+
             seq, score = candidate_sentences[j]
             for x, _ in enumerate(k_best):
                 candidate = [
@@ -137,8 +143,8 @@ def print_sentence(pred):
 
 def get_enc_dec_paths():
     """returns encoder and decoder path as tuple"""
-    enc_path = os.path.join(cur_dir, "rnn_checkpoints", "encoder.epoch12-loss0.42.hdf5")
-    dec_path = os.path.join(cur_dir, "rnn_checkpoints", "decoder.epoch12-loss0.42.hdf5")
+    enc_path = os.path.join(cur_dir, "rnn_checkpoints", "encoder.epoch09-loss0.29.hdf5")
+    dec_path = os.path.join(cur_dir, "rnn_checkpoints", "decoder.epoch09-loss0.29.hdf5")
 
     return (enc_path, dec_path)
 
@@ -153,9 +159,13 @@ def main():
         os.path.join(cur_dir, "test_data", "multi30k.dev_subword.en")
     )
 
-    inputs = rnn_pred_batch(["ein mann schläft in einem grünen raum auf einem sofa ."])
+    inputs = rnn_pred_batch(
+        [
+            "zwei frauen in rot und ein mann , der aus einer transportablen toilette kommt ."
+        ]
+    )
 
-    translate_sentence(inputs, k=3)
+    translate_sentence(inputs, k=10)
 
     # inputs = tf.convert_to_tensor(inputs)
     # print(inputs)
