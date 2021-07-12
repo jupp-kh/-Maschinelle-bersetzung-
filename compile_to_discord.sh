@@ -8,7 +8,7 @@ DISCORD_WEBHOOK="$2"
 data_msg="Report: All changes in repository \nDate: $(date)\n"
 
 
-output=($(git diff-tree --no-commit-id --name-status $CI_COMMIT_SHA))
+output=($(git diff-tree --no-commit-id --name-status -r $CI_COMMIT_SHA))
 LEN=${#output[*]}
 
 
