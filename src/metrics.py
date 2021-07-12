@@ -154,11 +154,15 @@ def brevity_penalty(referenz, hypothese):
 # function to compute the bleu metric
 # Bilingual Evaluation Study
 # Basic idea: How many blocks are identical in reference and hypothesis?
-def met_bleu(datei1, datei2, n):
+def met_bleu(datei1, datei2, n, path=True):
     """computes the bleu metric"""
     # NOTE! keep the else part for ci tester
-    referenz = ut.read_from_file(datei1) if os.path.isfile(datei1) else datei1
-    hypothese = ut.read_from_file(datei2) if os.path.isfile(datei2) else datei2
+    if path:
+        referenz = ut.read_from_file(datei1)
+        hypothese = ut.read_from_file(datei2)
+    else:
+        referenz = datei1
+        hypothese = datei2
     res = 0
 
     # calculate the precision
@@ -306,7 +310,7 @@ def main():
 
 
 def get_path_leaf(path):
-    """ For a path return the name of leaf file/folder """
+    """For a path return the name of leaf file/folder"""
     head, leaf = ntpath.split(path)
     return leaf or ntpath.basename(head)
 

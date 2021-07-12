@@ -18,7 +18,16 @@ import recurrent_dec as rnn_dec
 # import config file for hyperparameter search space
 # import config_custom_train as config
 
-max_line = 0
+# TODO automise creating the dicionaries for every traindata und give ist a special name
+
+# FIXME path as flags passen
+max_line = (
+    batches.get_max_line(
+        os.path.join(cur_dir, "train_data", "multi30k_subword.de"),
+        os.path.join(cur_dir, "train_data", "multi30k_subword.en"),
+    )
+    + 2
+)
 
 
 class BahdanauAttention(tf.keras.layers.Layer):

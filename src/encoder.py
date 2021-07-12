@@ -13,7 +13,7 @@ import ntpath
 
 
 class Table:
-    """ Table saves the learned words """
+    """Table saves the learned words"""
 
     # List of pairs and their frequency
     def __init__(self):
@@ -69,7 +69,7 @@ def get_words(lis_lines):
 
 
 def count_kn_word(word_tab):
-    """ count number of known words """
+    """count number of known words"""
     kn_counter = 0
     sw_counter = 0
     for key, val in word_tab.tabular.items():
