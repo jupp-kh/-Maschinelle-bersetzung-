@@ -186,6 +186,7 @@ class Translator(tf.keras.Model):
         self.encoder = Encoder(src_dim, em_dim, num_units, batch_size)
         self.decoder = Decoder(tar_dim, em_dim, num_units, batch_size)
 
+    @tf.function
     def train_step(self, inputs, hidden):
         """implements train_step from Model"""
         inputs, targ = inputs  # split input from Dataset
@@ -246,21 +247,26 @@ def perplexity(loss):
     return tf.keras.backend.exp(loss)
 
 
-def accuracy():
+def accuracy(real, pred):
     """computes and returns accuracy"""
-    pass
+    # top 1 from pred
+    real = tf.one_hot(real, depth=len(dic_tar.bi_dict))
+
+    # call accuracy
+    return tf.keras.metrics.Accuracy()(real, pred)
 
 
 # epochs, batch_size, metrics_rate and cp_rate should be flexible parameters
-def train_loop(epochs, data, batch_size, metric_rate, cp_rate):
+def train_loop(epochs, data, batch_size, metric_rate, cp_rate, load=False):
     """method for RNN train step"""
     # initialise with embedding = 200, units = 200 and batch_size = 200
-
-    # TODO distinguish between load model or init model und change the check point naming conventions!!
-
-    # model = Translator(len(dic_tar), len(dic_src), 200, 200, batch_size)
-    temp = tf.zeros((batch_size, 47))
-    model, _, _ = rnn_dec.roll_out_encoder(None, False, batch_size)
+    loss_list = []
+    # distinguish between load model or init model
+    if load:
+        model, _, _ = rnn_dec.roll_out_encoder(None, False, batch_size)
+    else:
+        model = Translator(len(dic_tar), len(dic_src), 200, 200, batch_size)
+        # temp = tf.zeros((batch_size, 47))
     # declare checkpoints
     # set cp directory rrn_checkpoints
     CHECKPOINT_DIR = os.path.join(cur_dir, "rnn_checkpoints")
@@ -287,11 +293,12 @@ def train_loop(epochs, data, batch_size, metric_rate, cp_rate):
 
         # saving checkpoints
         if (epoch + 1) % cp_rate == 0:
+            loss_list.append(tf.keras.backend.get_value(loss) / len(data))
             model.encoder.save_weights(  # saving encoder weights
                 os.path.join(
                     CHECKPOINT_DIR,
                     "encoder.epoch{:02d}-loss{:.2f}.hdf5".format(
-                        epoch + 1, (tf.keras.backend.get_value(loss) / len(data))
+                        epoch + 1, loss_list[-1]
                     ),
                 )
             )
@@ -299,7 +306,7 @@ def train_loop(epochs, data, batch_size, metric_rate, cp_rate):
                 os.path.join(
                     CHECKPOINT_DIR,
                     "decoder.epoch{:02d}-loss{:.2f}.hdf5".format(
-                        epoch + 1, (tf.keras.backend.get_value(loss) / len(data))
+                        epoch + 1, loss_list[-1]
                     ),
                 )
             )
@@ -312,7 +319,7 @@ def train_loop(epochs, data, batch_size, metric_rate, cp_rate):
         )
         print("Time taken: {} sec".format(time.time() - set_off))
 
-    return model
+    return model, loss_list
 
 
 def preprocess_data(en_path, de_path):
