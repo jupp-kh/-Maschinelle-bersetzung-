@@ -209,8 +209,8 @@ def print_sentence(pred):
 
 def get_enc_dec_paths():
     """returns encoder and decoder path as tuple"""
-    enc_path = os.path.join(cur_dir, "rnn_checkpoints", "encoder.epoch18-loss0.65.hdf5")
-    dec_path = os.path.join(cur_dir, "rnn_checkpoints", "decoder.epoch18-loss0.65.hdf5")
+    enc_path = os.path.join(cur_dir, "rnn_checkpoints", "encoder.epoch27-loss0.24.hdf5")
+    dec_path = os.path.join(cur_dir, "rnn_checkpoints", "decoder.epoch27-loss0.24.hdf5")
 
     return (enc_path, dec_path)
 
