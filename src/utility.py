@@ -100,17 +100,22 @@ def save_as_txt(file_des, data):
         write_f.write(data)
 
 
-def save_list_as_txt(file_des, data_list):
+def save_list_as_txt(file_des, data_list, strings=False):
     """ Saves data_list as csv in file_des """
     try:
         os.remove(file_des)
     except:
         print("No file, creating new file")
     with open(file_des, "w", encoding="utf-8") as write_f:
-        for line in data_list:
-            for word in line:
-                write_f.write(str(word) + " ")
-            write_f.write("\n")
+        if not strings:
+            for line in data_list:
+                for word in line:
+                    write_f.write(str(word) + " ")
+                write_f.write("\n")
+        else:
+            for line in data_list:
+                write_f.write(line)
+                write_f.write("\n")
 
 
 def save_line_as_txt(file_des, line):
