@@ -92,11 +92,12 @@ def roll_out_encoder(sentence, search=True, batch_size=1):
     test_model = rnn.Translator(len(dic_tar), len(dic_src), 200, 200, batch_size)
     dec_input = [[dic_src.bi_dict["<s>"]] + [0 for _ in range(max_line - 1)]]
     dec_input = np.array(dec_input)
-    temp = tf.zeros((batch_size, dec_input.shape[1]), dtype=tf.float32)
+    temp_enc = tf.zeros((batch_size, dec_input.shape[1]), dtype=tf.float32)
+    temp_dec = tf.zeros((batch_size, dec_input.shape[1]), dtype=tf.float32)
 
-    enc_output, _ = test_model.encoder(temp, None)
+    enc_output, _ = test_model.encoder(temp_enc, None)
 
-    dec_output, weights, state = test_model.decoder((temp, enc_output), None)
+    dec_output, weights, state = test_model.decoder((temp_dec, enc_output), None)
 
     test_model.encoder.load_weights(enc)
     test_model.decoder.load_weights(dec)
@@ -108,8 +109,71 @@ def roll_out_encoder(sentence, search=True, batch_size=1):
     return test_model, enc_output, dec_output
 
 
-# pred (1,47,len_Dic)-> (200,47,len_dic)
-# pre_pred_line [[],[]]
+def load_encoder(inputs, batch_size):
+    enc, dec = get_enc_dec_paths()
+    test_model = rnn.Encoder(dic_src, dic_src, 200, batch_size)
+    temp = tf.zeros((batch_size, max_line), dtype=tf.float32)
+    enc_output, _ = test_model.encoder(temp, None)
+    test_model.encoder.load_weights(enc)
+    outputs, _ = test_model(inputs, None)
+    return outputs
+
+
+def load_decouder(batch_size):
+    enc, dec = get_enc_dec_paths()
+    test_model = rnn.Decoder(dic_tar, dic_tar, 200, batch_size)
+    temp = tf.zeros((batch_size, max_line), dtype=tf.float32)
+    test_model(temp, None)
+    test_model.decoder.load_weights(dec)
+    return test_model
+
+
+# TODO use me to translate
+def translator(sentence, k=1):
+    batch_size = len(sentence)
+    enc_outputs = load_encoder(sentence, batch_size)
+    decoder = load_decouder(1)
+    result = []
+    for enc_output in enc_outputs:
+        dec_input = [[dic_src.bi_dict["<s>"]] + [0 for _ in range(max_line - 1)]]
+        dec_input = np.array(dec_input)
+        dec_output, _, _ = decoder((pre_sentence, enc_output))
+        first_pred = tf.math.top_k(dec_output, k)
+        candidate_sentences = []
+        for i in range(k):
+            candidate_sentences.append(
+                [
+                    [dic_tar.bi_dict["<s>"], get_value(first_pred.indices[0][0][i])],
+                    -math.log(get_value(first_pred.values[0][0][i])),
+                ]
+            )
+        pred_values = []
+        for index in range(1, max_line):
+            all_candidates = []
+            for j, _ in enumerate(candidate_sentences):
+                pre_pred_word = candidate_sentences[j][0]
+                if pre_pred_word[-1] == dic_tar.bi_dict["</s>"]:
+                    all_candidates.append(candidate_sentences[j])
+                    continue
+
+                pre_sentence = tf.keras.preprocessing.sequence.pad_sequences(
+                    [pre_pred_word], maxlen=max_line, value=0, padding="post"
+                )
+                pred_word, _, _ = decoder((pre_sentence, enc_output))
+
+                k_best = tf.math.top_k(pred_word, k=k)
+
+                seq, score = candidate_sentences[j]
+                for x, _ in enumerate(k_best.indices):
+                    candidate = [
+                        seq + [get_value(k_best.indices[0][index][x])],
+                        score - math.log(get_value(k_best.values[0][index][x])),
+                    ]
+                    all_candidates.append(candidate)
+            ordered = sorted(all_candidates, key=lambda tup: tup[1])
+            candidate_sentences = ordered[:k]
+        result.append(candidate_sentences)
+    return result
 
 
 def translate_sentence(sentence, k=1, one_line=False):
@@ -130,15 +194,15 @@ def translate_sentence(sentence, k=1, one_line=False):
     for index in range(1, max_line):
         all_candidates = []
         for j, _ in enumerate(candidate_sentences):
-            pre_pred_line = candidate_sentences[j][0]
-            if pre_pred_line[-1] == dic_tar.bi_dict["</s>"]:
+            pre_pred_word = candidate_sentences[j][0]
+            if pre_pred_word[-1] == dic_tar.bi_dict["</s>"]:
                 all_candidates.append(candidate_sentences[j])
                 continue
 
-            processed_line = tf.keras.preprocessing.sequence.pad_sequences(
-                [pre_pred_line], maxlen=max_line, value=0, padding="post"
+            pre_sentence = tf.keras.preprocessing.sequence.pad_sequences(
+                [pre_pred_word], maxlen=max_line, value=0, padding="post"
             )
-            pred_word, _, _ = model.decoder((processed_line, enc_output))
+            pred_word, _, _ = model.decoder((pre_sentence, enc_output))
 
             k_best = tf.math.top_k(pred_word, k=k)
 
@@ -183,7 +247,7 @@ def rnn_pred_batch(source_list):
         tmp = [
             dic_src.get_index(x)
             if x in dic_src.bi_dict
-            else random.randint(0, len(dic_src.bi_dict))
+            else random.randint(0, len(dic_src.bi_dict) - 1)
             for x in source_list[i].split(" ")
         ]
         source_list[i] = tmp
@@ -209,8 +273,8 @@ def print_sentence(pred):
 
 def get_enc_dec_paths():
     """returns encoder and decoder path as tuple"""
-    enc_path = os.path.join(cur_dir, "rnn_checkpoints", "encoder.epoch27-loss0.24.hdf5")
-    dec_path = os.path.join(cur_dir, "rnn_checkpoints", "decoder.epoch27-loss0.24.hdf5")
+    enc_path = os.path.join(cur_dir, "rnn_checkpoints", "encoder.epoch06-loss0.16.hdf5")
+    dec_path = os.path.join(cur_dir, "rnn_checkpoints", "decoder.epoch06-loss0.16.hdf5")
 
     return (enc_path, dec_path)
 
@@ -218,9 +282,6 @@ def get_enc_dec_paths():
 # TODO from terminal with runing with differnt model
 def bleu_score(source, target, k=1, n=4):
     # plot best result by k
-    target = read_from_file(
-        os.path.join(cur_dir, "test_data", "multi30k.dev_subword.en")
-    )
     x_achsis = []
     keys_list = dic_tar.get_keys()
     txt_list = []
@@ -229,7 +290,7 @@ def bleu_score(source, target, k=1, n=4):
     source = rnn_pred_batch(source)
 
     pred = beam_decoder(source, k)
-
+    # list of texts
     for elem in pred:
         # list of line string
         sentences = []
@@ -251,10 +312,9 @@ def bleu_score(source, target, k=1, n=4):
                 indices = j
         results.append(top_k[indices])
         bleu_results += best_bleu
-
-    # get avr bleu result
-    # bleu_results = round(bleu_results / len(results), 4)
     print(metrics.met_bleu(results, target, n, False))
+    # get avr bleu result
+    bleu_results = round((bleu_results / len(results)), 2)
     return results, bleu_results
 
 
