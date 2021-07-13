@@ -111,12 +111,16 @@ class Encoder(tf.keras.Model):
         self.bidirect_gru = tf.keras.layers.Bidirectional(
             self.gru_forward, backward_layer=self.gru_backward, merge_mode="sum"
         )
+        self.self_attention = BahdanauAttention(self.num_units)
 
     def call(self, inputs, hidden=None):
         """implements call from keras.Model"""
         # specify embedding input and pass in embedding in lstm layer
         em = self.embedding(inputs)
-        output, _, state = self.bidirect_gru(em, initial_state=hidden)
+        context, _ = self.self_attention(em, em)
+        rnn_context = tf.concat([context, em], axis=-1)
+
+        output, _, state = self.bidirect_gru(rnn_context, initial_state=hidden)
         return output, state
 
     def initialize_hidden_state(self):
@@ -167,10 +171,13 @@ class Decoder(tf.keras.Model):
         # initial_state should be of size: (batch size, units)
         # send through embedding layer
         inp, enc_output = inputs
+
         x = self.embedding(inp)
 
+        self_atten, _ = self.attention_mechanism(x, x)
+        dec_inputs = tf.concat([self_atten, x], axis=-1)
         # process one step with LSTM
-        outputs, state = self.gru(x, initial_state=initial_state)
+        outputs, state = self.gru(dec_inputs, initial_state=initial_state)
 
         # use the outputs variable for the attention over encoder's output
         # dec_query: output from decoder's lstm layer, enc_values: output from encoder's lstm layer
@@ -316,6 +323,7 @@ def train_loop(epochs, data, batch_size, metric_rate, cp_rate, load=False):
 
         # saving checkpoints
         if (epoch + 1) % cp_rate == 0:
+
             model.encoder.save_weights(  # saving encoder weights
                 os.path.join(
                     CHECKPOINT_DIR,
@@ -346,10 +354,10 @@ def train_loop(epochs, data, batch_size, metric_rate, cp_rate, load=False):
 
 def preprocess_data(en_path, de_path):
     """called from main to prepare dataset before initiating training"""
-    EPOCHS = 9
+    EPOCHS = 27
     BATCH_SZ = 200
     MET_RATE = 30
-    CP_RATE = 3
+    CP_RATE = 9
     # prepare dataset
     global max_line
     max_line, data = batches.create_batch_rnn(de_path, en_path)

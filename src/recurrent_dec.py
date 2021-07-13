@@ -108,6 +108,10 @@ def roll_out_encoder(sentence, search=True, batch_size=1):
     return test_model, enc_output, dec_output
 
 
+# pred (1,47,len_Dic)-> (200,47,len_dic)
+# pre_pred_line [[],[]]
+
+
 def translate_sentence(sentence, k=1, one_line=False):
     """translates sentence using beam search algorithm"""
 
@@ -126,15 +130,15 @@ def translate_sentence(sentence, k=1, one_line=False):
     for index in range(1, max_line):
         all_candidates = []
         for j, _ in enumerate(candidate_sentences):
-            pre_pred_word = candidate_sentences[j][0]
-            if pre_pred_word[-1] == dic_tar.bi_dict["</s>"]:
+            pre_pred_line = candidate_sentences[j][0]
+            if pre_pred_line[-1] == dic_tar.bi_dict["</s>"]:
                 all_candidates.append(candidate_sentences[j])
                 continue
 
-            pre_sentence = tf.keras.preprocessing.sequence.pad_sequences(
-                [pre_pred_word], maxlen=max_line, value=0, padding="post"
+            processed_line = tf.keras.preprocessing.sequence.pad_sequences(
+                [pre_pred_line], maxlen=max_line, value=0, padding="post"
             )
-            pred_word, _, _ = model.decoder((pre_sentence, enc_output))
+            pred_word, _, _ = model.decoder((processed_line, enc_output))
 
             k_best = tf.math.top_k(pred_word, k=k)
 
@@ -162,7 +166,6 @@ def beam_decoder(source, k, save=False):
     set_off = time.time()
     for i, src in enumerate(source):
         file_txt.append(translate_sentence(src, k))
-        print(i)
 
     print("Time taken to predict k={}: {:.2f} sec".format(k, time.time() - set_off))
     # TODO add the blue metrik and print it.
@@ -206,8 +209,8 @@ def print_sentence(pred):
 
 def get_enc_dec_paths():
     """returns encoder and decoder path as tuple"""
-    enc_path = os.path.join(cur_dir, "rnn_checkpoints", "encoder.epoch36-loss0.29.hdf5")
-    dec_path = os.path.join(cur_dir, "rnn_checkpoints", "decoder.epoch36-loss0.29.hdf5")
+    enc_path = os.path.join(cur_dir, "rnn_checkpoints", "encoder.epoch18-loss0.65.hdf5")
+    dec_path = os.path.join(cur_dir, "rnn_checkpoints", "decoder.epoch18-loss0.65.hdf5")
 
     return (enc_path, dec_path)
 
@@ -215,6 +218,9 @@ def get_enc_dec_paths():
 # TODO from terminal with runing with differnt model
 def bleu_score(source, target, k=1, n=4):
     # plot best result by k
+    target = read_from_file(
+        os.path.join(cur_dir, "test_data", "multi30k.dev_subword.en")
+    )
     x_achsis = []
     keys_list = dic_tar.get_keys()
     txt_list = []
@@ -223,7 +229,7 @@ def bleu_score(source, target, k=1, n=4):
     source = rnn_pred_batch(source)
 
     pred = beam_decoder(source, k)
-    # list of texts
+
     for elem in pred:
         # list of line string
         sentences = []
@@ -247,7 +253,8 @@ def bleu_score(source, target, k=1, n=4):
         bleu_results += best_bleu
 
     # get avr bleu result
-    bleu_results = round(bleu_results / len(results), 4)
+    # bleu_results = round(bleu_results / len(results), 4)
+    print(metrics.met_bleu(results, target, n, False))
     return results, bleu_results
 
 
@@ -257,9 +264,7 @@ def main():
     source = read_from_file(
         os.path.join(cur_dir, "test_data", "multi30k.dev_subword.de")
     )
-    target = read_from_file(
-        os.path.join(cur_dir, "test_data", "multi30k.dev_subword.en")
-    )
+    target = read_from_file(os.path.join(cur_dir, "test_data", "multi30k.dev.en"))
 
     inputs = [
         "ein kleines kind steht allein auf einem zerklüfteten felsen .",
@@ -274,7 +279,7 @@ def main():
     # inputs = rnn_pred_batch(source)
     # translate_sentence(x, 1, True)
     # beam_decoder(inputs, 1, True)
-    res, bleu = bleu_score(source, target, 5)
+    res, bleu = bleu_score(source, target, 1)
     save_translation(res, bleu)
 
     # inputs = tf.convert_to_tensor(inputs)
