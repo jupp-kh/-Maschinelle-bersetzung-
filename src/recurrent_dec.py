@@ -41,7 +41,7 @@ def save_translation(fd, bleu_score):
         os.path.join(
             cur_dir,
             "de_en_translation",
-            "beam_bleu=" + str(bleu_score) + "_prediction.de",
+            "beam_bleu=" + str(bleu_score) + "_prediction.en",
         ),
         fd,
         strings=True,
@@ -52,7 +52,7 @@ def save_translation(fd, bleu_score):
         os.path.join(
             cur_dir,
             "de_en_translation",
-            "beam_bleu=" + str(bleu_score) + "_prediction.de",
+            "beam_bleu=" + str(bleu_score) + "_prediction.en",
         ),
     )
 
@@ -162,7 +162,6 @@ def beam_decoder(source, k, save=False):
     set_off = time.time()
     for i, src in enumerate(source):
         file_txt.append(translate_sentence(src, k))
-        print(i)
 
     print("Time taken to predict k={}: {:.2f} sec".format(k, time.time() - set_off))
     # TODO add the blue metrik and print it.
@@ -274,7 +273,7 @@ def main():
     # inputs = rnn_pred_batch(source)
     # translate_sentence(x, 1, True)
     # beam_decoder(inputs, 1, True)
-    res, bleu = bleu_score(source, target, 5)
+    res, bleu = bleu_score(inputs, targ, 5)
     save_translation(res, bleu)
 
     # inputs = tf.convert_to_tensor(inputs)
@@ -285,11 +284,12 @@ def main():
 
 def rec_dec_tester():
     """called for testing specific methods"""
-    rnn.init_dics()
-    inputs = rnn_pred_batch(["ein mann schläft in einem grünen raum auf einem sofa ."])
-    target = rnn_pred_batch(["a man sleeping in a green room on a couch ."])
-
-    m = roll_out_encoder(None)
+    origin = os.path.join(cur_dir, "de_en_translation", "beam_bleu=0.553_prediction.en")
+    fd = os.path.join(cur_dir, "test_data", "multi30k.dev.en")
+    origin = read_from_file(origin)
+    fd = read_from_file(fd)
+    for orign, line in zip(origin, fd):
+        print(metrics.met_bleu([orign], [line], n=4, path=False))
 
 
 if __name__ == "__main__":
