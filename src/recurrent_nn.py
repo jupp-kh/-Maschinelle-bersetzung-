@@ -22,7 +22,7 @@ import recurrent_dec as rnn_dec
 
 # TODO automise creating the dicionaries for every traindata und give ist a special name
 
-# FIXME path as flags passen
+# FIXME pass in path as flags
 max_line = (
     batches.get_max_line(
         os.path.join(cur_dir, "train_data", "multi30k_subword.de"),
@@ -268,6 +268,7 @@ def accuracy(real, pred):
 
 
 # epochs, batch_size, metrics_rate and cp_rate should be flexible parameters
+# train loop could be set as the fit method for translator model
 def train_loop(epochs, data, batch_size, metric_rate, cp_rate, load=False):
     """method for RNN train step"""
     # initialise with embedding = 200, units = 200 and batch_size = 200
@@ -309,7 +310,9 @@ def train_loop(epochs, data, batch_size, metric_rate, cp_rate, load=False):
 
                 # updating tensorboard scalars
                 with tb_writer.as_default():
-                    tf.summary.scalar("Loss", b_loss, step=model.optimizer.iterations)
+                    tf.summary.scalar(
+                        "Loss", (loss / i), step=model.optimizer.iterations
+                    )
 
         # saving checkpoints
         if (epoch + 1) % cp_rate == 0:
