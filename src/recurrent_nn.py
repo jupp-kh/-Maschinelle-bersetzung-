@@ -174,10 +174,8 @@ class Decoder(tf.keras.Model):
 
         x = self.embedding(inp)
 
-        self_atten, _ = self.attention_mechanism(x, x)
-        dec_inputs = tf.concat([self_atten, x], axis=-1)
         # process one step with LSTM
-        outputs, state = self.gru(dec_inputs, initial_state=initial_state)
+        outputs, state = self.gru(x, initial_state=initial_state)
 
         # use the outputs variable for the attention over encoder's output
         # dec_query: output from decoder's lstm layer, enc_values: output from encoder's lstm layer
@@ -276,7 +274,7 @@ def accuracy(real, pred):
 
 # epochs, batch_size, metrics_rate and cp_rate should be flexible parameters
 # train loop could be set as the fit method for translator model
-def train_loop(epochs, data, batch_size, metric_rate, cp_rate, load=False):
+def train_loop(epochs, data, batch_size, metric_rate, cp_rate, cp_start, load=False):
     """method for RNN train step"""
     # initialise with embedding = 200, units = 200 and batch_size = 200
     # distinguish between load model or init model
@@ -322,7 +320,7 @@ def train_loop(epochs, data, batch_size, metric_rate, cp_rate, load=False):
                     )
 
         # saving checkpoints
-        if (epoch + 1) % cp_rate == 0:
+        if cp_start <= (epoch + 1) and (epoch + 1) % cp_rate == 0:
 
             model.encoder.save_weights(  # saving encoder weights
                 os.path.join(
@@ -354,10 +352,11 @@ def train_loop(epochs, data, batch_size, metric_rate, cp_rate, load=False):
 
 def preprocess_data(en_path, de_path):
     """called from main to prepare dataset before initiating training"""
-    EPOCHS = 27
+    EPOCHS = 9
     BATCH_SZ = 200
     MET_RATE = 30
-    CP_RATE = 9
+    CP_START = 6
+    CP_RATE = 3
     # prepare dataset
     global max_line
     max_line, data = batches.create_batch_rnn(de_path, en_path)
@@ -371,7 +370,7 @@ def preprocess_data(en_path, de_path):
     # data = data.repeat(1)
 
     # run the train loop
-    return (EPOCHS, data, BATCH_SZ, MET_RATE, CP_RATE)
+    return (EPOCHS, data, BATCH_SZ, MET_RATE, CP_RATE, CP_START)
 
 
 def main():
@@ -383,8 +382,8 @@ def main():
     en_path = os.path.join(cur_dir, "train_data", "multi30k_subword.en")
     de_path = os.path.join(cur_dir, "train_data", "multi30k_subword.de")
     # batch = batches.create_batch_rnn(de_path, en_path)
-    epochs, data, sz, met, cp = preprocess_data(en_path, de_path)
-    model = train_loop(epochs, data, sz, met, cp)
+    epochs, data, sz, met, cp, cp_start = preprocess_data(en_path, de_path)
+    model = train_loop(epochs, data, sz, met, cp, cp_start, True)
 
     # dataset = tf.data.Dataset(np.array(batch.source))(
     #     batch_size=200, drop_remainder=True
