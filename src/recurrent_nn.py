@@ -2,9 +2,11 @@
 includes the rnn model
 """
 import time
+import datetime
 import numpy as np
 import os
 import tensorflow as tf
+from tensorflow._api.v2 import summary
 from tensorflow.python.eager.context import context
 from dictionary import dic_tar, dic_src
 from utility import cur_dir
@@ -269,14 +271,19 @@ def accuracy(real, pred):
 def train_loop(epochs, data, batch_size, metric_rate, cp_rate, load=False):
     """method for RNN train step"""
     # initialise with embedding = 200, units = 200 and batch_size = 200
-    loss_list = []
     # distinguish between load model or init model
     if load:
         model, _, _ = rnn_dec.roll_out_encoder(None, False, batch_size)
     else:
         model = Translator(len(dic_tar), len(dic_src), 200, 200, batch_size)
         # temp = tf.zeros((batch_size, 47))
-    # declare checkpoints
+
+    # tensorboard summary destination
+    tb_log_dir = os.path.join(
+        "rnn_logs", datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    )
+    tb_writer = tf.summary.create_file_writer(logdir=tb_log_dir)
+
     # set cp directory rrn_checkpoints
     CHECKPOINT_DIR = os.path.join(cur_dir, "rnn_checkpoints")
 
@@ -300,14 +307,17 @@ def train_loop(epochs, data, batch_size, metric_rate, cp_rate, load=False):
                     )
                 )
 
+                # updating tensorboard scalars
+                with tb_writer.as_default():
+                    tf.summary.scalar("Loss", b_loss, step=model.optimizer.iterations)
+
         # saving checkpoints
         if (epoch + 1) % cp_rate == 0:
-            loss_list.append(tf.keras.backend.get_value(loss) / len(data))
             model.encoder.save_weights(  # saving encoder weights
                 os.path.join(
                     CHECKPOINT_DIR,
                     "encoder.epoch{:02d}-loss{:.2f}.hdf5".format(
-                        epoch + 1, loss_list[-1]
+                        epoch + 1, tf.keras.backend.get_value(loss) / len(data)
                     ),
                 )
             )
@@ -315,7 +325,7 @@ def train_loop(epochs, data, batch_size, metric_rate, cp_rate, load=False):
                 os.path.join(
                     CHECKPOINT_DIR,
                     "decoder.epoch{:02d}-loss{:.2f}.hdf5".format(
-                        epoch + 1, loss_list[-1]
+                        epoch + 1, tf.keras.backend.get_value(loss) / len(data)
                     ),
                 )
             )
@@ -328,7 +338,7 @@ def train_loop(epochs, data, batch_size, metric_rate, cp_rate, load=False):
         )
         print("Time taken: {} sec".format(time.time() - set_off))
 
-    return model, loss_list
+    return model
 
 
 def preprocess_data(en_path, de_path):
