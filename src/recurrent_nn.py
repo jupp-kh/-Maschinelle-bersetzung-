@@ -120,8 +120,8 @@ class Encoder(tf.keras.Model):
         context, _ = self.self_attention(em, em)
         rnn_context = tf.concat([context, em], axis=-1)
 
-        output, _, state = self.bidirect_gru(rnn_context, initial_state=hidden)
-        return output, state
+        output, _, _, h, c = self.bidirect_lstm(rnn_context, initial_state=hidden)
+        return output, h, c
 
     def initialize_hidden_state(self):
         return [
@@ -148,6 +148,12 @@ class Decoder(tf.keras.Model):
         # Embedding Layer to reduce input size
         self.embedding = tf.keras.layers.Embedding(vocab_size, embedding_dim)
 
+        self.lstm = tf.keras.layers.LSTM(
+            self.dec_units,
+            return_sequences=True,
+            return_state=True,
+            name="LSTM",
+        )
         # Define the fundamental cell for decoder recurrent structure
         self.gru = tf.keras.layers.GRU(
             self.dec_units,
@@ -175,7 +181,7 @@ class Decoder(tf.keras.Model):
         x = self.embedding(inp)
 
         # process one step with LSTM
-        outputs, state = self.gru(x, initial_state=initial_state)
+        outputs, h, c = self.lstm(x, initial_state=initial_state)
 
         # use the outputs variable for the attention over encoder's output
         # dec_query: output from decoder's lstm layer, enc_values: output from encoder's lstm layer
@@ -191,7 +197,7 @@ class Decoder(tf.keras.Model):
         # final output layer - applying softmax
         outputs = self.softmax(attention_vector)
 
-        return outputs, weights, state
+        return outputs, weights
 
 
 class Translator(tf.keras.Model):
@@ -213,12 +219,12 @@ class Translator(tf.keras.Model):
         with tf.GradientTape() as tape:
             # pass input into encoder
             # enc_output: whole_sequence_output, h: final_mem_state, c: final_cell_state
-            enc_output, state = self.encoder(inputs, None)
+            enc_output, h, c = self.encoder(inputs, None)
             dec_input = targ[:, :-1]  # ignore 0 token
             real = targ[:, 1:]  # ignore <s> token
 
             # pass input into decoder
-            dec_output, weights, state = self.decoder((dec_input, enc_output), None)
+            dec_output, weights = self.decoder((dec_input, enc_output), [h, c])
             # print(real.shape, dec_output.shape)
 
             # targ represent the real values whilst dec_output is a softmax layer
@@ -279,7 +285,7 @@ def train_loop(epochs, data, batch_size, metric_rate, cp_rate, cp_start, load=Fa
     # initialise with embedding = 200, units = 200 and batch_size = 200
     # distinguish between load model or init model
     if load:
-        model, _, _ = rnn_dec.roll_out_encoder(None, False, batch_size)
+        model, _, _, _, _ = rnn_dec.roll_out_encoder(None, False, batch_size)
     else:
         model = Translator(len(dic_tar), len(dic_src), 200, 200, batch_size)
         # temp = tf.zeros((batch_size, 47))
@@ -291,7 +297,7 @@ def train_loop(epochs, data, batch_size, metric_rate, cp_rate, cp_start, load=Fa
     tb_writer = tf.summary.create_file_writer(logdir=tb_log_dir)
 
     # set cp directory rrn_checkpoints
-    CHECKPOINT_DIR = os.path.join(cur_dir, "rnn_checkpoints")
+    CHECKPOINT_DIR = os.path.join(cur_dir, "rnn_checkpoints", "lstm_self_attention")
 
     for epoch in range(epochs):
         loss = 0
@@ -355,8 +361,8 @@ def preprocess_data(en_path, de_path):
     EPOCHS = 9
     BATCH_SZ = 200
     MET_RATE = 30
-    CP_START = 6
-    CP_RATE = 3
+    CP_START = 9
+    CP_RATE = 9
     # prepare dataset
     global max_line
     max_line, data = batches.create_batch_rnn(de_path, en_path)
@@ -384,7 +390,9 @@ def main():
     # batch = batches.create_batch_rnn(de_path, en_path)
     epochs, data, sz, met, cp, cp_start = preprocess_data(en_path, de_path)
     model = train_loop(epochs, data, sz, met, cp, cp_start, True)
-
+    model.encoder.summary()
+    model.decoder.summary()
+    # model.summary()
     # dataset = tf.data.Dataset(np.array(batch.source))(
     #     batch_size=200, drop_remainder=True
     # )
