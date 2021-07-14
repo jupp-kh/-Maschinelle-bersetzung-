@@ -21,12 +21,12 @@ import recurrent_dec as rnn_dec
 # import config_custom_train as config
 
 INFO = {
-    "EPOCHS": 25,
-    "BATCH_SZ": 200,
+    "EPOCHS": 18,
+    "BATCH_SZ": 100,
     "MET_RATE": 30,
-    "CP_START": 20,
-    "CP_RATE": 5,
-    "UNITS": 200,
+    "CP_START": 6,
+    "CP_RATE": 6,
+    "UNITS": 500,
 }
 
 # TODO automise creating the dicionaries for every traindata und give ist a special name
@@ -36,8 +36,8 @@ max_line = 0
 try:
     max_line = (
         batches.get_max_line(
-            os.path.join(cur_dir, "train_data", "multi30k_subword.de"),
-            os.path.join(cur_dir, "train_data", "multi30k_subword.en"),
+            os.path.join(cur_dir, "train_data", "multi30k.de"),
+            os.path.join(cur_dir, "train_data", "multi30k.en"),
         )
         + 2
     )
@@ -63,7 +63,7 @@ class BahdanauAttention(tf.keras.layers.Layer):
 
         # print(enc_values_dense.shape, enc_values.shape, dec_query_dense.shape)
         context_vector, attention_weights = self.attention(
-            inputs=[dec_query_dense, enc_values, enc_values_dense],
+            inputs=[dec_query_dense, enc_values_dense],
             return_attention_scores=True,
         )
         # print("done")
@@ -307,7 +307,9 @@ def train_loop(epochs, data, batch_size, metric_rate, cp_rate, cp_start, load=Fa
     tb_writer = tf.summary.create_file_writer(logdir=tb_log_dir)
 
     # set cp directory rrn_checkpoints
-    CHECKPOINT_DIR = os.path.join(cur_dir, "rnn_checkpoints", "lstm_self_attention")
+    CHECKPOINT_DIR = os.path.join(
+        cur_dir, "rnn_checkpoints", "lstm_self_attention_500_bpe=inf"
+    )
 
     for epoch in range(epochs):
         loss = 0
@@ -394,12 +396,12 @@ def preprocess_data(en_path, de_path):
 
 def main():
     """main method"""
-    init_dics()
+    init_dics("_None")
     # encoder = Encoder(len(dic_src), 200, 200, 200)
     # decoder = Decoder(len(dic_tar), 200, 200, 200)
 
-    en_path = os.path.join(cur_dir, "train_data", "multi30k_subword.en")
-    de_path = os.path.join(cur_dir, "train_data", "multi30k_subword.de")
+    en_path = os.path.join(cur_dir, "train_data", "multi30k.en")
+    de_path = os.path.join(cur_dir, "train_data", "multi30k.de")
     # batch = batches.create_batch_rnn(de_path, en_path)
     epochs, data, sz, met, cp, cp_start = preprocess_data(en_path, de_path)
     model = train_loop(epochs, data, sz, met, cp, cp_start, True)

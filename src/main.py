@@ -59,7 +59,7 @@ def overcome_max_line():
 def create_bi_dicts():
     """store src and trg dictionaries"""
     read_de = util.read_from_file(os.path.join(os.curdir, commands["train-src"]))
-    read_en = util.read_from_file(os.path.join(os.curdir, commands["train-src"]))
+    read_en = util.read_from_file(os.path.join(os.curdir, commands["train-tar"]))
 
     _, _ = batches.get_word_index(read_de, read_en)
 
@@ -69,7 +69,7 @@ def create_bi_dicts():
 
 # change these parameters for tokenising and training paths
 commands = {
-    "token": 40,  # number of bpe operations
+    "token": None,  # number of bpe operations
     "train-src": "train_data/multi30k.de",  # path to training files
     "train-tar": "train_data/multi30k.en",  # path to training files
     "test-src": "test_data/multi30k.dev.de",  # path to test files
@@ -83,9 +83,9 @@ commands = {
 def nmt_preprocessing():
     """"""
     # remove old data files
-    os.system("rm -r nmt_data/*")
+    # os.system("rm -r nmt_data/*")
 
-    if "token":
+    if commands["token"]:
         # number of bpe operations
         try:
             tokenise_data_bpe(commands["token"], commands["train-src"], ind="src")
@@ -112,13 +112,30 @@ def run_nmt():
     print(rnn.INFO)
     en_path = os.path.join(os.curdir, commands["train-tar"])
     de_path = os.path.join(os.curdir, commands["train-src"])
+    data = rnn.preprocess_data(en_path, de_path)[1]
+    rnn.train_loop(
+        rnn.INFO["EPOCHS"],
+        data,
+        rnn.INFO["BATCH_SZ"],
+        rnn.INFO["MET_RATE"],
+        rnn.INFO["CP_RATE"],
+        rnn.INFO["CP_START"],
+    )
+
+
+def search():
+    pass
+
+
+methods = {"train": run_nmt, "dic_subword": nmt_preprocessing, "search": search}
 
 
 def main():
-    # nmt_preprocessing()
+    method = input("which method to run: \n" + "\n".join(methods.keys()) + "\n:")
+    methods[method]()
 
     # ask for hyperparameters
-    run_nmt()
+    # run_nmt()
 
 
 if __name__ == "__main__":

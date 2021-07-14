@@ -94,7 +94,9 @@ def save_k_txt(file_txt, k):
 def roll_out_encoder(sentence, search=True, batch_size=1):
     """builds and returns a model from model's path"""
     enc, dec = get_enc_dec_paths()
-    test_model = rnn.Translator(len(dic_tar), len(dic_src), 200, 200, batch_size)
+    test_model = rnn.Translator(
+        len(dic_tar), len(dic_src), 200, rnn.INFO["UNITS"], batch_size
+    )
     dec_input = [[dic_src.bi_dict["<s>"]] + [0 for _ in range(max_line - 1)]]
     dec_input = np.array(dec_input)
     temp_enc = tf.zeros((batch_size, dec_input.shape[1]), dtype=tf.float32)
@@ -117,7 +119,7 @@ def roll_out_encoder(sentence, search=True, batch_size=1):
 def load_encoder(inputs, batch_size):
 
     enc, dec = get_enc_dec_paths()
-    test_model = rnn.Encoder(len(dic_src), 200, 200, batch_size)
+    test_model = rnn.Encoder(len(dic_src), 200, rnn.INFO["UNITS"], batch_size)
     temp = tf.zeros((batch_size, max_line), dtype=tf.float32)
     test_model(temp, None)
 
@@ -126,11 +128,11 @@ def load_encoder(inputs, batch_size):
     return outputs, h, c
 
 
-def load_decouder(batch_size):
+def load_decoder(batch_size):
     enc, dec = get_enc_dec_paths()
-    test_model = rnn.Decoder(len(dic_tar), 200, 200, batch_size)
+    test_model = rnn.Decoder(len(dic_tar), 200, rnn.INFO["UNITS"], batch_size)
     temp = tf.zeros((batch_size, max_line), dtype=tf.float32)
-    enc_temp = tf.zeros((batch_size, max_line, 200), dtype=tf.float32)
+    enc_temp = tf.zeros((batch_size, max_line, rnn.INFO["UNITS"]), dtype=tf.float32)
 
     test_model((temp, enc_temp))
     test_model.load_weights(dec)
@@ -139,8 +141,8 @@ def load_decouder(batch_size):
 
 def translator(sentence, k=1):
     batch_size = len(sentence)
-    enc_outputs, enc_h, enc_c = load_encoder(sentence, 200)
-    decoder = load_decouder(1)
+    enc_outputs, enc_h, enc_c = load_encoder(sentence, batch_size)
+    decoder = load_decoder(1)
     result = []
     for enc_output, h, c in zip(enc_outputs, enc_h, enc_c):
         dec_input = [[dic_src.bi_dict["<s>"]] + [0 for _ in range(max_line - 1)]]
@@ -296,7 +298,7 @@ def print_sentence(pred):
 
 
 # TODO from terminal with runing with differnt model
-def bleu_score(source, target, k=1, n=4):
+def bleu_score(source, target, batch_size, k=1, n=4):
     # plot best result by k
     set_off = time.time()
     x_achsis = []
@@ -306,7 +308,7 @@ def bleu_score(source, target, k=1, n=4):
     # run beam decoder and evaluate results
     source = rnn_pred_batch(source)
     print("Time taken to predict k={}: {:.2f} sec".format(k, time.time() - set_off))
-    pred = fast_beam_search(source, k, 200)
+    pred = fast_beam_search(source, k, batch_size)
     # pred = beam_decoder(source, k)
     # list of texts
     for elem in pred:
@@ -341,14 +343,14 @@ def get_enc_dec_paths():
     enc_path = os.path.join(
         cur_dir,
         "rnn_checkpoints",
-        "lstm_self_attention",
-        "encoder.epoch09-loss0.12.hdf5",
+        "lstm_self_attention_500_bpe=inf",
+        "encoder.epoch06-loss0.26.hdf5",
     )
     dec_path = os.path.join(
         cur_dir,
         "rnn_checkpoints",
-        "lstm_self_attention",
-        "decoder.epoch09-loss0.12.hdf5",
+        "lstm_self_attention_500_bpe=inf",
+        "decoder.epoch06-loss0.26.hdf5",
     )
 
     return (enc_path, dec_path)
@@ -356,10 +358,8 @@ def get_enc_dec_paths():
 
 def main():
     """main method"""
-    rnn.init_dics()
-    source = read_from_file(
-        os.path.join(cur_dir, "test_data", "multi30k.dev_subword.de")
-    )
+    rnn.init_dics("_None")
+    source = read_from_file(os.path.join(cur_dir, "test_data", "multi30k.dev.de"))
     target = read_from_file(os.path.join(cur_dir, "test_data", "multi30k.dev.en"))
 
     inputs = [
@@ -375,7 +375,7 @@ def main():
     # inputs = rnn_pred_batch(source)
     # translate_sentence(x, 1, True)
     # beam_decoder(inputs, 1, True)
-    res, bleu = bleu_score(source, target, 5)
+    res, bleu = bleu_score(source, target, 100)
     save_translation(res, bleu)
     # print(fast_beam_search(source, 1, 200))
     # inputs = tf.convert_to_tensor(inputs)
