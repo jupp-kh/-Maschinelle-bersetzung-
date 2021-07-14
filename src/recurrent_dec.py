@@ -7,6 +7,7 @@ import math
 import time
 import multiprocessing
 import itertools
+from numpy.testing._private.utils import tempdir
 import tensorflow as tf
 import numpy as np
 import random
@@ -114,34 +115,37 @@ def roll_out_encoder(sentence, search=True, batch_size=1):
 
 
 def load_encoder(inputs, batch_size):
+
     enc, dec = get_enc_dec_paths()
-    test_model = rnn.Encoder(dic_src, dic_src, 200, batch_size)
+    test_model = rnn.Encoder(len(dic_src), 200, 200, batch_size)
     temp = tf.zeros((batch_size, max_line), dtype=tf.float32)
-    enc_output, _ = test_model.encoder(temp, None)
-    test_model.encoder.load_weights(enc)
-    outputs, _ = test_model(inputs, None)
-    return outputs
+    test_model(temp, None)
+
+    test_model.load_weights(enc)
+    outputs, h, c = test_model(inputs, None)
+    return outputs, h, c
 
 
 def load_decouder(batch_size):
     enc, dec = get_enc_dec_paths()
-    test_model = rnn.Decoder(dic_tar, dic_tar, 200, batch_size)
+    test_model = rnn.Decoder(len(dic_tar), 200, 200, batch_size)
     temp = tf.zeros((batch_size, max_line), dtype=tf.float32)
-    test_model(temp, None)
-    test_model.decoder.load_weights(dec)
+    enc_temp = tf.zeros((batch_size, max_line, 200), dtype=tf.float32)
+
+    test_model((temp, enc_temp))
+    test_model.load_weights(dec)
     return test_model
 
 
-# TODO use me to translate
 def translator(sentence, k=1):
     batch_size = len(sentence)
-    enc_outputs = load_encoder(sentence, batch_size)
+    enc_outputs, enc_h, enc_c = load_encoder(sentence, 200)
     decoder = load_decouder(1)
     result = []
-    for enc_output in enc_outputs:
+    for enc_output, h, c in zip(enc_outputs, enc_h, enc_c):
         dec_input = [[dic_src.bi_dict["<s>"]] + [0 for _ in range(max_line - 1)]]
         dec_input = np.array(dec_input)
-        dec_output, _, _ = decoder((pre_sentence, enc_output))
+        dec_output, _ = decoder((dec_input, enc_output), [[h], [c]])
         first_pred = tf.math.top_k(dec_output, k)
         candidate_sentences = []
         for i in range(k):
@@ -163,7 +167,7 @@ def translator(sentence, k=1):
                 pre_sentence = tf.keras.preprocessing.sequence.pad_sequences(
                     [pre_pred_word], maxlen=max_line, value=0, padding="post"
                 )
-                pred_word, _, _ = decoder((pre_sentence, enc_output))
+                pred_word, _ = decoder((pre_sentence, enc_output), [[h], [c]])
 
                 k_best = tf.math.top_k(pred_word, k=k)
 
@@ -177,6 +181,23 @@ def translator(sentence, k=1):
             ordered = sorted(all_candidates, key=lambda tup: tup[1])
             candidate_sentences = ordered[:k]
         result.append(candidate_sentences)
+    return result
+
+
+def fast_beam_search(source, k, batch_size):
+    result = []
+    start = 0
+    ende = batch_size
+    src_len = len(source)
+    set_off = time.time()
+    while src_len > ende:
+        print(start)
+        result = result + translator(source[start:ende], k)
+        start = ende
+        ende += batch_size
+    result = result + translator(source[start:src_len], k)
+    print("Time taken to predict k={}: {:.2f} sec".format(k, time.time() - set_off))
+
     return result
 
 
@@ -234,7 +255,6 @@ def beam_decoder(source, k, save=False):
     set_off = time.time()
     for i, src in enumerate(source):
         file_txt.append(translate_sentence(src, k))
-        print(i)
     print("Time taken to predict k={}: {:.2f} sec".format(k, time.time() - set_off))
     # TODO add the blue metrik and print it.
 
@@ -278,14 +298,16 @@ def print_sentence(pred):
 # TODO from terminal with runing with differnt model
 def bleu_score(source, target, k=1, n=4):
     # plot best result by k
+    set_off = time.time()
     x_achsis = []
     keys_list = dic_tar.get_keys()
     txt_list = []
 
     # run beam decoder and evaluate results
     source = rnn_pred_batch(source)
-
-    pred = beam_decoder(source, k)
+    print("Time taken to predict k={}: {:.2f} sec".format(k, time.time() - set_off))
+    pred = fast_beam_search(source, k, 200)
+    # pred = beam_decoder(source, k)
     # list of texts
     for elem in pred:
         # list of line string
@@ -353,9 +375,9 @@ def main():
     # inputs = rnn_pred_batch(source)
     # translate_sentence(x, 1, True)
     # beam_decoder(inputs, 1, True)
-    res, bleu = bleu_score(source, target, 1)
+    res, bleu = bleu_score(source, target, 5)
     save_translation(res, bleu)
-
+    # print(fast_beam_search(source, 1, 200))
     # inputs = tf.convert_to_tensor(inputs)
     # print(inputs)
     # f, s = translate_line(1, inputs, 1)
