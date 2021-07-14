@@ -95,18 +95,18 @@ def roll_out_encoder(sentence, search=True, batch_size=1):
     temp_enc = tf.zeros((batch_size, dec_input.shape[1]), dtype=tf.float32)
     temp_dec = tf.zeros((batch_size, dec_input.shape[1]), dtype=tf.float32)
 
-    enc_output, _ = test_model.encoder(temp_enc, None)
+    enc_output, h, c = test_model.encoder(temp_enc, None)
 
-    dec_output, weights, state = test_model.decoder((temp_dec, enc_output), None)
+    dec_output, _ = test_model.decoder((temp_dec, enc_output), None)
 
     test_model.encoder.load_weights(enc)
     test_model.decoder.load_weights(dec)
     if search:
         sentence = np.array([sentence])
-        enc_output, _ = test_model.encoder(sentence, None)
-        dec_output, weights, state = test_model.decoder((dec_input, enc_output), None)
+        enc_output, h, c = test_model.encoder(sentence, None)
+        dec_output, _ = test_model.decoder((dec_input, enc_output), [h, c])
 
-    return test_model, enc_output, dec_output
+    return test_model, enc_output, dec_output, h, c
 
 
 def load_encoder(inputs, batch_size):
@@ -179,7 +179,7 @@ def translator(sentence, k=1):
 def translate_sentence(sentence, k=1, one_line=False):
     """translates sentence using beam search algorithm"""
 
-    model, enc_output, dec_output = roll_out_encoder(sentence)
+    model, enc_output, dec_output, h, c = roll_out_encoder(sentence)
     first_pred = tf.math.top_k(dec_output, k)
 
     candidate_sentences = []
@@ -202,7 +202,7 @@ def translate_sentence(sentence, k=1, one_line=False):
             pre_sentence = tf.keras.preprocessing.sequence.pad_sequences(
                 [pre_pred_word], maxlen=max_line, value=0, padding="post"
             )
-            pred_word, _, _ = model.decoder((pre_sentence, enc_output))
+            pred_word, _ = model.decoder((pre_sentence, enc_output), [h, c])
 
             k_best = tf.math.top_k(pred_word, k=k)
 
@@ -230,7 +230,7 @@ def beam_decoder(source, k, save=False):
     set_off = time.time()
     for i, src in enumerate(source):
         file_txt.append(translate_sentence(src, k))
-
+        print(i)
     print("Time taken to predict k={}: {:.2f} sec".format(k, time.time() - set_off))
     # TODO add the blue metrik and print it.
 
@@ -271,14 +271,6 @@ def print_sentence(pred):
     print(" ".join(res))
 
 
-def get_enc_dec_paths():
-    """returns encoder and decoder path as tuple"""
-    enc_path = os.path.join(cur_dir, "rnn_checkpoints", "encoder.epoch06-loss0.16.hdf5")
-    dec_path = os.path.join(cur_dir, "rnn_checkpoints", "decoder.epoch06-loss0.16.hdf5")
-
-    return (enc_path, dec_path)
-
-
 # TODO from terminal with runing with differnt model
 def bleu_score(source, target, k=1, n=4):
     # plot best result by k
@@ -316,6 +308,24 @@ def bleu_score(source, target, k=1, n=4):
     # get avr bleu result
     bleu_results = round((bleu_results / len(results)), 2)
     return results, bleu_results
+
+
+def get_enc_dec_paths():
+    """returns encoder and decoder path as tuple"""
+    enc_path = os.path.join(
+        cur_dir,
+        "rnn_checkpoints",
+        "lstm_self_attention",
+        "encoder.epoch09-loss0.12.hdf5",
+    )
+    dec_path = os.path.join(
+        cur_dir,
+        "rnn_checkpoints",
+        "lstm_self_attention",
+        "decoder.epoch09-loss0.12.hdf5",
+    )
+
+    return (enc_path, dec_path)
 
 
 def main():
