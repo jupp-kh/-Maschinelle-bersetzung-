@@ -138,27 +138,25 @@ def create_op_sequences(file, n):
     op_sequences = get_op_sequences(file, n)
     file_des = os.path.join(
         utility.cur_dir,
-        "output",
+        "nmt_data",
         ntpath.splitext(ntpath.basename(file))[0]
-        + "_op_sequence_"
+        + "_oper_"
         + str(n)
-        + ntpath.splitext(ntpath.basename(file))[1]
-        + ".csv",
+        + ntpath.splitext(ntpath.basename(file))[1],
     )
     utility.save_as_csv(file_des, op_sequences)
+    return file_des
 
 
 #
-
-
-def subword_split(text_file, sequence_file):
+def subword_split(text_file, sequence_file, n):
     """
     runs subword split on text_file
     """
     lines_list = utility.read_from_file(text_file)
     text = ""
 
-    #
+    # adding end of word symbol to words
     for line in lines_list:
         for word in line.split():
             text += " ".join(list(word)) + "</w> "
@@ -171,15 +169,19 @@ def subword_split(text_file, sequence_file):
         text = text.replace(sequence, sequence.replace(" ", ""))
 
     text = text.replace(" ", "@@ ").replace("</w>@@", "")
+
+    # specify path destination for saving
     file_des = os.path.join(
         utility.cur_dir,
-        "output",
+        "nmt_data",
         ntpath.splitext(ntpath.basename(text_file))[0]
-        + "_subword"
+        + "_subword_"
+        + str(n)
         + ntpath.splitext(ntpath.basename(text_file))[1],
     )
 
     utility.save_as_txt(file_des, text)
+    return file_des
 
 
 def revert_bpe(file):
@@ -194,28 +196,13 @@ def revert_bpe(file):
         write_f.write(reader.replace("@@ ", ""))
 
 
-def run_bpe(*oper):
+def run_bpe(des_file, *oper):
     for n in oper:  # replace list with op_number
-        # create_op_sequences(
-        #    os.path.join(utility.cur_dir, "data_exercise_3/multi30k.de"), n
-        # )
-        # create_op_sequences(
-        #    os.path.join(utility.cur_dir, "data_exercise_3/multi30k.en"), n
-        # )
+        op_seq_file = create_op_sequences(des_file, n)
 
-        subword_split(
-            os.path.join(utility.cur_dir, "data_exercise_3/multi30k.dev.de"),
-            os.path.join(
-                utility.cur_dir, "output", "multi30k_op_sequence_" + str(n) + ".de.csv"
-            ),
-        )
-        subword_split(
-            os.path.join(utility.cur_dir, "data_exercise_3", "multi30k.dev.en"),
-            os.path.join(
-                utility.cur_dir, "output", "multi30k_op_sequence_" + str(n) + ".en.csv"
-            ),
-        )
+        tkn_file = subword_split(des_file, op_seq_file, n=n)
     # revert_bpe("Abgabe 2/data_exercise_2/multi30k.de100")
+    return op_seq_file, tkn_file
 
 
 def rename_me():

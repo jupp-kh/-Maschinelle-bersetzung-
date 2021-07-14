@@ -26,13 +26,17 @@ from tensorflow.keras.backend import get_value
 # TODO create pool to translate the hole dev file
 
 # +2 for start and end of sequence symbol
-max_line = (
-    batches.get_max_line(
-        os.path.join(cur_dir, "train_data", "multi30k_subword.de"),
-        os.path.join(cur_dir, "train_data", "multi30k_subword.en"),
+max_line = 0
+try:
+    max_line = (
+        batches.get_max_line(
+            os.path.join(cur_dir, "train_data", "multi30k_subword.de"),
+            os.path.join(cur_dir, "train_data", "multi30k_subword.en"),
+        )
+        + 2
     )
-    + 2
-)
+except Exception as exx:
+    print("Issue with max_line {}".format(exx))
 
 
 def save_translation(fd, bleu_score):

@@ -23,13 +23,17 @@ import recurrent_dec as rnn_dec
 # TODO automise creating the dicionaries for every traindata und give ist a special name
 
 # FIXME pass in path as flags
-max_line = (
-    batches.get_max_line(
-        os.path.join(cur_dir, "train_data", "multi30k_subword.de"),
-        os.path.join(cur_dir, "train_data", "multi30k_subword.en"),
+max_line = 0
+try:
+    max_line = (
+        batches.get_max_line(
+            os.path.join(cur_dir, "train_data", "multi30k_subword.de"),
+            os.path.join(cur_dir, "train_data", "multi30k_subword.en"),
+        )
+        + 2
     )
-    + 2
-)
+except Exception as exx:
+    print("Issue with max_line {}".format(exx))
 
 
 class BahdanauAttention(tf.keras.layers.Layer):
@@ -240,10 +244,10 @@ class Translator(tf.keras.Model):
 
 
 # init dictionaries
-def init_dics():
+def init_dics(bpe=""):
     """read learned dictionaries for source and target"""
-    dic_src.get_stored(os.path.join(cur_dir, "dictionaries", "source_dictionary"))
-    dic_tar.get_stored(os.path.join(cur_dir, "dictionaries", "target_dictionary"))
+    dic_src.get_stored(os.path.join(cur_dir, "dictionaries", "source_dictionary" + bpe))
+    dic_tar.get_stored(os.path.join(cur_dir, "dictionaries", "target_dictionary" + bpe))
 
 
 def categorical_loss(real, pred):
