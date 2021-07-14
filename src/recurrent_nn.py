@@ -20,6 +20,15 @@ import recurrent_dec as rnn_dec
 # import config file for hyperparameter search space
 # import config_custom_train as config
 
+INFO = {
+    "EPOCHS": 25,
+    "BATCH_SZ": 200,
+    "MET_RATE": 30,
+    "CP_START": 20,
+    "CP_RATE": 5,
+    "UNITS": 200,
+}
+
 # TODO automise creating the dicionaries for every traindata und give ist a special name
 
 # FIXME pass in path as flags
@@ -141,13 +150,10 @@ class Encoder(tf.keras.Model):
 
 
 class Decoder(tf.keras.Model):
-    def __init__(
-        self, vocab_size, embedding_dim, dec_units, batch_sz, attention_type="luong"
-    ):
+    def __init__(self, vocab_size, embedding_dim, dec_units, batch_sz):
         super(Decoder, self).__init__()
         self.batch_sz = batch_sz
         self.dec_units = dec_units
-        self.attention_type = attention_type
 
         # Embedding Layer to reduce input size
         self.embedding = tf.keras.layers.Embedding(vocab_size, embedding_dim)
@@ -291,7 +297,7 @@ def train_loop(epochs, data, batch_size, metric_rate, cp_rate, cp_start, load=Fa
     if load:
         model, _, _, _, _ = rnn_dec.roll_out_encoder(None, False, batch_size)
     else:
-        model = Translator(len(dic_tar), len(dic_src), 200, 200, batch_size)
+        model = Translator(len(dic_tar), len(dic_src), 200, INFO["UNITS"], batch_size)
         # temp = tf.zeros((batch_size, 47))
 
     # tensorboard summary destination
@@ -331,7 +337,6 @@ def train_loop(epochs, data, batch_size, metric_rate, cp_rate, cp_start, load=Fa
 
         # saving checkpoints
         if cp_start <= (epoch + 1) and (epoch + 1) % cp_rate == 0:
-
             model.encoder.save_weights(  # saving encoder weights
                 os.path.join(
                     CHECKPOINT_DIR,
@@ -362,11 +367,6 @@ def train_loop(epochs, data, batch_size, metric_rate, cp_rate, cp_start, load=Fa
 
 def preprocess_data(en_path, de_path):
     """called from main to prepare dataset before initiating training"""
-    EPOCHS = 9
-    BATCH_SZ = 200
-    MET_RATE = 30
-    CP_START = 9
-    CP_RATE = 9
     # prepare dataset
     global max_line
     max_line, data = batches.create_batch_rnn(de_path, en_path)
@@ -376,11 +376,20 @@ def preprocess_data(en_path, de_path):
 
     # merge both input points
     data = tf.data.Dataset.zip((data, tarset))
-    data = data.shuffle(buffer_size=100).batch(batch_size=BATCH_SZ, drop_remainder=True)
+    data = data.shuffle(buffer_size=100).batch(
+        batch_size=INFO["BATCH_SZ"], drop_remainder=True
+    )
     # data = data.repeat(1)
 
     # run the train loop
-    return (EPOCHS, data, BATCH_SZ, MET_RATE, CP_RATE, CP_START)
+    return (
+        INFO["EPOCHS"],
+        data,
+        INFO["BATCH_SZ"],
+        INFO["MET_RATE"],
+        INFO["CP_RATE"],
+        INFO["CP_START"],
+    )
 
 
 def main():
