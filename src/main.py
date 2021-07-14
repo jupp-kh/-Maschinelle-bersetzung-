@@ -1,6 +1,7 @@
 """
 training:
     python3 main.py --tokenise 400 --training-path multi30k 
+    without tokenise to directly use multi30k.de/en
 testing:
     python3 main.py --seq-path nmt_data/multi30k_sequence_400.de --test-path multi30k
 do everything:
@@ -36,53 +37,85 @@ def tokenise_data_bpe(divs, des, train=True):
             )
 
 
-def launch_dictionary_update(src, trg, bpe):
-    """launches and creates the bidirectional dictionary for src and trg"""
-    path1 = os.path.join(os.curdir, "dictionaries", "source_dic_" + bpe)
-    path2 = os.path.join(os.curdir, "dictionaries", "target_dic_" + bpe)
-
-    util.save_list_as_txt(path1, src, strings=True)
-    util.save_list_as_txt(path2, trg, strings=True)
-    return path1, path2
-
-
 def overcome_max_line():
     """important for max_line error"""
-    rnn.max_line = (
-        batches.get_max_line(
-            os.path.join(
-                os.curdir,
-                commands["--train-data"] + "_subword_" + commands["--tokenise"] + ".de",
-            ),
-            os.path.join(
-                os.curdir,
-                commands["--train-data"] + "_subword_" + commands["--tokenise"] + ".en",
-            ),
+    if "--tokenise" in sys.argv:
+        rnn.max_line = (
+            batches.get_max_line(
+                os.path.join(
+                    os.curdir,
+                    commands["--train-data"]
+                    + "_subword_"
+                    + commands["--tokenise"]
+                    + ".de",
+                ),
+                os.path.join(
+                    os.curdir,
+                    commands["--train-data"]
+                    + "_subword_"
+                    + commands["--tokenise"]
+                    + ".en",
+                ),
+            )
+            + 2
         )
-        + 2
-    )
+    else:  # take the standard data files from train_data
+        rnn.max_line = (
+            batches.get_max_line(
+                os.path.join(
+                    os.curdir,
+                    commands["--train-data"] + "multi30k" ".de",
+                ),
+                os.path.join(
+                    os.curdir,
+                    commands["--train-data"] + "multi30k" + ".en",
+                ),
+            )
+            + 2
+        )
     rnn_dec.max_line = rnn.max_line
 
 
 def create_bi_dicts():
     """store src and trg dictionaries"""
-    read_de = util.read_from_file(
-        os.path.join(
-            os.curdir,
-            commands["--train-data"] + "_subword_" + commands["--tokenise"] + ".de",
+    if "--tokenise" in sys.argv:
+        read_de = util.read_from_file(
+            os.path.join(
+                os.curdir,
+                commands["--train-data"] + "_subword_" + commands["--tokenise"] + ".de",
+            )
         )
-    )
-    read_en = util.read_from_file(
-        os.path.join(
-            os.curdir,
-            commands["--train-data"] + "_subword_" + commands["--tokenise"] + ".en",
+        read_en = util.read_from_file(
+            os.path.join(
+                os.curdir,
+                commands["--train-data"] + "_subword_" + commands["--tokenise"] + ".en",
+            )
         )
-    )
-
+    else:
+        read_de = util.read_from_file(
+            os.path.join(
+                os.curdir,
+                commands["--train-data"] + "multi30k" + ".de",
+            )
+        )
+        read_en = util.read_from_file(
+            os.path.join(
+                os.curdir,
+                commands["--train-data"] + "multi30k" + ".en",
+            )
+        )
     #
     _, _ = batches.get_word_index(read_de, read_en)
-    dictionary.dic_src.store_dictionary("source_dictionary_" + commands["--tokenise"])
-    dictionary.dic_tar.store_dictionary("target_dictionary_" + commands["--tokenise"])
+    if "--tokenise" in sys.argv:
+        dictionary.dic_src.store_dictionary(
+            "source_dictionary_" + commands["--tokenise"]
+        )
+        dictionary.dic_tar.store_dictionary(
+            "target_dictionary_" + commands["--tokenise"]
+        )
+    else:
+        dictionary.dic_src.store_dictionary("source_dictionary_")
+        dictionary.dic_tar.store_dictionary("target_dictionary_")
 
 
 commands = {
@@ -96,7 +129,7 @@ commands = {
 }
 
 
-def main():
+def nmt_preprocessing():
     args = sys.argv
     if "--training-path" in args:
         commands["--training-path"] += args[args.index("--training-path") + 1]
@@ -125,19 +158,42 @@ def main():
                 commands["--training-path"],
                 train=True,
             )
-
         # get test data ready
         if "--test-path" in args:
             tokenise_data_bpe(None, commands["--test-path"], train=False)
+    else:
+        commands["--train-data"] = commands["--training-path"]
+
+        if "--test-path" in args:
+            commands["--test-data"] = commands["--test-path"]
 
     # overcome error from max_line in rnn
     overcome_max_line()  # call on nmt/"tokenised data file"
 
-    create_bi_dicts()
-    print(len(dictionary.dic_tar.bi_dict))
-    print(len(dictionary.dic_src.bi_dict))
     # create dictionary files for training data
     # initialise both dictionaries
+    create_bi_dicts()
+
+    # dictionaries done
+    # files noted in commands
+    print(commands)
+
+    # Added parameters in command
+    # 'train_tkn_file.en':
+    # 'train_tkn_file.de':
+    # 'seq-file.de':
+    # 'seq-file.en':
+
+
+def run_nmt():
+    pass
+
+
+def main():
+    nmt_preprocessing()
+
+    # ask for hyperparameters
+    run_nmt()
 
 
 if __name__ == "__main__":
