@@ -205,8 +205,8 @@ def print_sentence(pred):
 
 def get_enc_dec_paths():
     """returns encoder and decoder path as tuple"""
-    enc_path = os.path.join(cur_dir, "rnn_checkpoints", "encoder.epoch36-loss0.29.hdf5")
-    dec_path = os.path.join(cur_dir, "rnn_checkpoints", "decoder.epoch36-loss0.29.hdf5")
+    enc_path = os.path.join(cur_dir, "rnn_checkpoints", "encoder.epoch27-loss0.46.hdf5")
+    dec_path = os.path.join(cur_dir, "rnn_checkpoints", "decoder.epoch27-loss0.46.hdf5")
 
     return (enc_path, dec_path)
 
@@ -244,7 +244,7 @@ def bleu_score(source, target, k=1, n=4):
                 indices = j
         results.append(top_k[indices])
         bleu_results += best_bleu
-
+    print(metrics.met_bleu(results, target, n, False))
     # get avr bleu result
     bleu_results = round(bleu_results / len(results), 4)
     return results, bleu_results
@@ -256,9 +256,7 @@ def main():
     source = read_from_file(
         os.path.join(cur_dir, "test_data", "multi30k.dev_subword.de")
     )
-    target = read_from_file(
-        os.path.join(cur_dir, "test_data", "multi30k.dev_subword.en")
-    )
+    target = read_from_file(os.path.join(cur_dir, "test_data", "multi30k.dev.en"))
 
     inputs = [
         "ein kleines kind steht allein auf einem zerklüfteten felsen .",
@@ -273,7 +271,7 @@ def main():
     # inputs = rnn_pred_batch(source)
     # translate_sentence(x, 1, True)
     # beam_decoder(inputs, 1, True)
-    res, bleu = bleu_score(inputs, targ, 5)
+    res, bleu = bleu_score(source, target, 1)
     save_translation(res, bleu)
 
     # inputs = tf.convert_to_tensor(inputs)
