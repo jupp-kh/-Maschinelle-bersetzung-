@@ -30,8 +30,10 @@ max_line = 0
 try:
     max_line = (
         batches.get_max_line(
-            os.path.join(cur_dir, "train_data", "multi30k_subword.de"),
-            os.path.join(cur_dir, "train_data", "multi30k_subword.en"),
+            os.path.join(cur_dir, "output", "multi30k_subword.de"),
+            os.path.join(cur_dir, "output", "multi30k_subword.en"),
+            #os.path.join(cur_dir, "train_data", "multi30k.de"),
+            #os.path.join(cur_dir, "train_data", "multi30k.en"),
         )
         + 2
     )
@@ -90,9 +92,9 @@ def save_k_txt(file_txt, k):
         )
 
 
-def roll_out_encoder(sentence, search=True, batch_size=1):
+def roll_out_encoder(sentence, search=True, batch_size=1, path=False, name=False):
     """builds and returns a model from model's path"""
-    enc, dec = get_enc_dec_paths()
+    enc, dec = get_enc_dec_paths(path=path, name=name)
     test_model = rnn.Translator(len(dic_tar), len(dic_src), 200, 200, batch_size)
     dec_input = [[dic_src.bi_dict["<s>"]] + [0 for _ in range(max_line - 1)]]
     dec_input = np.array(dec_input)
@@ -180,10 +182,10 @@ def translator(sentence, k=1):
     return result
 
 
-def translate_sentence(sentence, k=1, one_line=False):
+def translate_sentence(sentence, k=1, one_line=False, path=False, name=False):
     """translates sentence using beam search algorithm"""
 
-    model, enc_output, dec_output, h, c = roll_out_encoder(sentence)
+    model, enc_output, dec_output, h, c = roll_out_encoder(sentence, path=path, name=name)
     first_pred = tf.math.top_k(dec_output, k)
 
     candidate_sentences = []
@@ -228,13 +230,14 @@ def translate_sentence(sentence, k=1, one_line=False):
 
 
 # TODO translate with bigger batch_size dont forger remainder sentences
-def beam_decoder(source, k, save=False):
+def beam_decoder(source, k, save=False, path=False, name=False):
     """finds the best translation scores using the beam decoder."""
     file_txt = []
     set_off = time.time()
     for i, src in enumerate(source):
-        file_txt.append(translate_sentence(src, k))
-        print(i)
+        file_txt.append(translate_sentence(src, k, path=path, name=name))
+        if (i % 10) == 0:
+            print(i)
     print("Time taken to predict k={}: {:.2f} sec".format(k, time.time() - set_off))
     # TODO add the blue metrik and print it.
 
@@ -276,7 +279,7 @@ def print_sentence(pred):
 
 
 # TODO from terminal with runing with differnt model
-def bleu_score(source, target, k=1, n=4):
+def bleu_score(source, target, k=1, n=4, path=False, name=False):
     # plot best result by k
     x_achsis = []
     keys_list = dic_tar.get_keys()
@@ -285,7 +288,7 @@ def bleu_score(source, target, k=1, n=4):
     # run beam decoder and evaluate results
     source = rnn_pred_batch(source)
 
-    pred = beam_decoder(source, k)
+    pred = beam_decoder(source, k, path=path, name=name)
     # list of texts
     for elem in pred:
         # list of line string
@@ -311,24 +314,34 @@ def bleu_score(source, target, k=1, n=4):
     print(metrics.met_bleu(results, target, n, False))
     # get avr bleu result
     bleu_results = round((bleu_results / len(results)), 2)
-    return results, bleu_results
+    return results, metrics.met_bleu(results, target, n, False)
 
 
-def get_enc_dec_paths():
+def get_enc_dec_paths(path=False, name=False):
     """returns encoder and decoder path as tuple"""
-    enc_path = os.path.join(
-        cur_dir,
-        "rnn_checkpoints",
-        "lstm_self_attention",
-        "encoder.epoch09-loss0.12.hdf5",
-    )
-    dec_path = os.path.join(
-        cur_dir,
-        "rnn_checkpoints",
-        "lstm_self_attention",
-        "decoder.epoch09-loss0.12.hdf5",
-    )
-
+    if not path:
+        enc_path = os.path.join(
+            cur_dir,
+            "rnn_checkpoints",
+            "lstm_self_attention",
+            "encoder.epoch09-loss0.12.hdf5",
+        )
+        dec_path = os.path.join(
+            cur_dir,
+            "rnn_checkpoints",
+            "lstm_self_attention",
+            "decoder.epoch09-loss0.12.hdf5",
+        )
+    else:
+        enc_path = os.path.join(
+            path,
+            "encoder."+name,
+        )
+        dec_path = os.path.join(
+            path,
+            "decoder."+name,
+        )
+    
     return (enc_path, dec_path)
 
 
