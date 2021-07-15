@@ -22,12 +22,12 @@ import recurrent_dec as rnn_dec
 # import config_custom_train as config
 
 INFO = {
-    "EPOCHS": 4,
-    "BATCH_SZ": 200,
+    "EPOCHS": 10,
+    "BATCH_SZ": 100,
     "MET_RATE": 30,
-    "CP_START": 1,
+    "CP_START": 4,
     "CP_RATE": 2,
-    "UNITS": 200,
+    "UNITS": 786,
 }
 
 # TODO automise creating the dicionaries for every traindata und give ist a special name
@@ -311,7 +311,7 @@ def train_loop(epochs, data, batch_size, metric_rate, cp_rate, cp_start, load=Fa
 
     # set cp directory rrn_checkpoints
     CHECKPOINT_DIR = os.path.join(
-        cur_dir, "rnn_checkpoints", "lstm_self_attention_500_bpe=inf"
+        cur_dir, "rnn_checkpoints", "lstm_self_attention_786_bpe=7000"
     )
 
     for epoch in range(epochs):
@@ -407,7 +407,7 @@ def main():
     de_path = os.path.join(cur_dir, "train_data", "multi30k_subword.de")
     # batch = batches.create_batch_rnn(de_path, en_path)
     epochs, data, sz, met, cp, cp_start = preprocess_data(en_path, de_path)
-    model = train_loop(epochs, data, sz, met, cp, cp_start, True)
+    model = train_loop(epochs, data, sz, met, cp, cp_start, False)
     model.encoder.summary()
     model.decoder.summary()
     # model.summary()
