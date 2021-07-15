@@ -315,7 +315,7 @@ def bleu_score(source, target, batch_size, k=1, n=4, path=False):
 
     print("Time taken to predict k={}: {:.2f} sec".format(k, time.time() - set_off))
     pred = fast_beam_search(source, k, batch_size, path=path)
-    # pred = beam_decoder(source, k, path=path)
+    #pred = beam_decoder(source, k, path=path)
     # list of texts
     for elem in pred:
         # list of line string

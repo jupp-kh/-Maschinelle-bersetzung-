@@ -45,8 +45,8 @@ for e, d in zip(sorted(files_enc), sorted(files_dec)):
     target = read_from_file(os.path.join(cur_dir, "test_data", "multi30k.dev_mini.en"))
 
 
-
-    res, bleu = rnn_dec.bleu_score(source, target, 1, path=cp_path, name=e[8:])
+    enc_path = os.path.join(cp_path, e)
+    res, bleu = rnn_dec.bleu_score(source, target, 1, path=enc_path)
     print("BLEU for Epoch",int(e.split("epoch")[1].split("-")[0]),"is:",bleu)
     dev_bleu[act_epoch] = bleu
 
