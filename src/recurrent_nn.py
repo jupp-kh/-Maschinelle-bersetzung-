@@ -20,6 +20,15 @@ import recurrent_dec as rnn_dec
 # import config file for hyperparameter search space
 # import config_custom_train as config
 
+INFO = {
+    "EPOCHS": 18,
+    "BATCH_SZ": 100,
+    "MET_RATE": 30,
+    "CP_START": 6,
+    "CP_RATE": 6,
+    "UNITS": 500,
+}
+
 # TODO automise creating the dicionaries for every traindata und give ist a special name
 
 # FIXME pass in path as flags
@@ -27,8 +36,8 @@ max_line = 0
 try:
     max_line = (
         batches.get_max_line(
-            os.path.join(cur_dir, "train_data", "multi30k_subword.de"),
-            os.path.join(cur_dir, "train_data", "multi30k_subword.en"),
+            os.path.join(cur_dir, "train_data", "multi30k.de"),
+            os.path.join(cur_dir, "train_data", "multi30k.en"),
         )
         + 2
     )
@@ -54,7 +63,7 @@ class BahdanauAttention(tf.keras.layers.Layer):
 
         # print(enc_values_dense.shape, enc_values.shape, dec_query_dense.shape)
         context_vector, attention_weights = self.attention(
-            inputs=[dec_query_dense, enc_values, enc_values_dense],
+            inputs=[dec_query_dense, enc_values_dense],
             return_attention_scores=True,
         )
         # print("done")
@@ -141,13 +150,10 @@ class Encoder(tf.keras.Model):
 
 
 class Decoder(tf.keras.Model):
-    def __init__(
-        self, vocab_size, embedding_dim, dec_units, batch_sz, attention_type="luong"
-    ):
+    def __init__(self, vocab_size, embedding_dim, dec_units, batch_sz):
         super(Decoder, self).__init__()
         self.batch_sz = batch_sz
         self.dec_units = dec_units
-        self.attention_type = attention_type
 
         # Embedding Layer to reduce input size
         self.embedding = tf.keras.layers.Embedding(vocab_size, embedding_dim)
@@ -291,7 +297,7 @@ def train_loop(epochs, data, batch_size, metric_rate, cp_rate, cp_start, load=Fa
     if load:
         model, _, _, _, _ = rnn_dec.roll_out_encoder(None, False, batch_size)
     else:
-        model = Translator(len(dic_tar), len(dic_src), 200, 200, batch_size)
+        model = Translator(len(dic_tar), len(dic_src), 200, INFO["UNITS"], batch_size)
         # temp = tf.zeros((batch_size, 47))
 
     # tensorboard summary destination
@@ -301,7 +307,9 @@ def train_loop(epochs, data, batch_size, metric_rate, cp_rate, cp_start, load=Fa
     tb_writer = tf.summary.create_file_writer(logdir=tb_log_dir)
 
     # set cp directory rrn_checkpoints
-    CHECKPOINT_DIR = os.path.join(cur_dir, "rnn_checkpoints", "lstm_self_attention")
+    CHECKPOINT_DIR = os.path.join(
+        cur_dir, "rnn_checkpoints", "lstm_self_attention_500_bpe=inf"
+    )
 
     for epoch in range(epochs):
         loss = 0
@@ -331,7 +339,6 @@ def train_loop(epochs, data, batch_size, metric_rate, cp_rate, cp_start, load=Fa
 
         # saving checkpoints
         if cp_start <= (epoch + 1) and (epoch + 1) % cp_rate == 0:
-
             model.encoder.save_weights(  # saving encoder weights
                 os.path.join(
                     CHECKPOINT_DIR,
@@ -362,11 +369,6 @@ def train_loop(epochs, data, batch_size, metric_rate, cp_rate, cp_start, load=Fa
 
 def preprocess_data(en_path, de_path):
     """called from main to prepare dataset before initiating training"""
-    EPOCHS = 9
-    BATCH_SZ = 200
-    MET_RATE = 30
-    CP_START = 9
-    CP_RATE = 9
     # prepare dataset
     global max_line
     max_line, data = batches.create_batch_rnn(de_path, en_path)
@@ -376,21 +378,30 @@ def preprocess_data(en_path, de_path):
 
     # merge both input points
     data = tf.data.Dataset.zip((data, tarset))
-    data = data.shuffle(buffer_size=100).batch(batch_size=BATCH_SZ, drop_remainder=True)
+    data = data.shuffle(buffer_size=100).batch(
+        batch_size=INFO["BATCH_SZ"], drop_remainder=True
+    )
     # data = data.repeat(1)
 
     # run the train loop
-    return (EPOCHS, data, BATCH_SZ, MET_RATE, CP_RATE, CP_START)
+    return (
+        INFO["EPOCHS"],
+        data,
+        INFO["BATCH_SZ"],
+        INFO["MET_RATE"],
+        INFO["CP_RATE"],
+        INFO["CP_START"],
+    )
 
 
 def main():
     """main method"""
-    init_dics()
+    init_dics("_None")
     # encoder = Encoder(len(dic_src), 200, 200, 200)
     # decoder = Decoder(len(dic_tar), 200, 200, 200)
 
-    en_path = os.path.join(cur_dir, "train_data", "multi30k_subword.en")
-    de_path = os.path.join(cur_dir, "train_data", "multi30k_subword.de")
+    en_path = os.path.join(cur_dir, "train_data", "multi30k.en")
+    de_path = os.path.join(cur_dir, "train_data", "multi30k.de")
     # batch = batches.create_batch_rnn(de_path, en_path)
     epochs, data, sz, met, cp, cp_start = preprocess_data(en_path, de_path)
     model = train_loop(epochs, data, sz, met, cp, cp_start, True)

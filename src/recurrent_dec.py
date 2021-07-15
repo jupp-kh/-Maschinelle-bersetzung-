@@ -2,11 +2,13 @@
 recurrent_dec.py offers methods to compute beam search and greedy search 
 translations are made using the RNN model from recurrent_nn.py
 """
+from json import decoder
 import os
 import math
 import time
 import multiprocessing
 import itertools
+from numpy.testing._private.utils import tempdir
 import tensorflow as tf
 import numpy as np
 import random
@@ -92,10 +94,12 @@ def save_k_txt(file_txt, k):
         )
 
 
-def roll_out_encoder(sentence, search=True, batch_size=1, path=False, name=False):
+def roll_out_encoder(sentence, search=True, batch_size=1, path=False):
     """builds and returns a model from model's path"""
-    enc, dec = get_enc_dec_paths(path=path, name=name)
-    test_model = rnn.Translator(len(dic_tar), len(dic_src), 200, 200, batch_size)
+    enc, dec = get_enc_dec_paths(path=path)
+    test_model = rnn.Translator(
+        len(dic_tar), len(dic_src), 200, rnn.INFO["UNITS"], batch_size
+    )
     dec_input = [[dic_src.bi_dict["<s>"]] + [0 for _ in range(max_line - 1)]]
     dec_input = np.array(dec_input)
     temp_enc = tf.zeros((batch_size, dec_input.shape[1]), dtype=tf.float32)
@@ -115,35 +119,38 @@ def roll_out_encoder(sentence, search=True, batch_size=1, path=False, name=False
     return test_model, enc_output, dec_output, h, c
 
 
-def load_encoder(inputs, batch_size):
-    enc, dec = get_enc_dec_paths()
-    test_model = rnn.Encoder(dic_src, dic_src, 200, batch_size)
-    temp = tf.zeros((batch_size, max_line), dtype=tf.float32)
-    enc_output, _ = test_model.encoder(temp, None)
-    test_model.encoder.load_weights(enc)
-    outputs, _ = test_model(inputs, None)
-    return outputs
+def load_encoder(inputs, batch_size, path=False):
 
-
-def load_decouder(batch_size):
-    enc, dec = get_enc_dec_paths()
-    test_model = rnn.Decoder(dic_tar, dic_tar, 200, batch_size)
+    enc, dec = get_enc_dec_paths(path=path)
+    test_model = rnn.Encoder(len(dic_src), 200, rnn.INFO["UNITS"], batch_size)
     temp = tf.zeros((batch_size, max_line), dtype=tf.float32)
     test_model(temp, None)
-    test_model.decoder.load_weights(dec)
+
+    test_model.load_weights(enc)
+    outputs, h, c = test_model(inputs, None)
+    return outputs, h, c
+
+
+def load_decoder(batch_size, path=False):
+    enc, dec = get_enc_dec_paths(path=path)
+    test_model = rnn.Decoder(len(dic_tar), 200, rnn.INFO["UNITS"], batch_size)
+    temp = tf.zeros((batch_size, max_line), dtype=tf.float32)
+    enc_temp = tf.zeros((batch_size, max_line, rnn.INFO["UNITS"]), dtype=tf.float32)
+
+    test_model((temp, enc_temp))
+    test_model.load_weights(dec)
     return test_model
 
 
-# TODO use me to translate
-def translator(sentence, k=1):
+def translator(sentence, k=1, path=False):
     batch_size = len(sentence)
-    enc_outputs = load_encoder(sentence, batch_size)
-    decoder = load_decouder(1)
+    enc_outputs, enc_h, enc_c = load_encoder(sentence, batch_size, path=path)
+    decoder = load_decoder(1, path=path)
     result = []
-    for enc_output in enc_outputs:
+    for enc_output, h, c in zip(enc_outputs, enc_h, enc_c):
         dec_input = [[dic_src.bi_dict["<s>"]] + [0 for _ in range(max_line - 1)]]
         dec_input = np.array(dec_input)
-        dec_output, _, _ = decoder((pre_sentence, enc_output))
+        dec_output, _ = decoder((dec_input, enc_output), [[h], [c]])
         first_pred = tf.math.top_k(dec_output, k)
         candidate_sentences = []
         for i in range(k):
@@ -165,7 +172,7 @@ def translator(sentence, k=1):
                 pre_sentence = tf.keras.preprocessing.sequence.pad_sequences(
                     [pre_pred_word], maxlen=max_line, value=0, padding="post"
                 )
-                pred_word, _, _ = decoder((pre_sentence, enc_output))
+                pred_word, _ = decoder((pre_sentence, enc_output), [[h], [c]])
 
                 k_best = tf.math.top_k(pred_word, k=k)
 
@@ -182,10 +189,27 @@ def translator(sentence, k=1):
     return result
 
 
-def translate_sentence(sentence, k=1, one_line=False, path=False, name=False):
+def fast_beam_search(source, k, batch_size, path=False):
+    result = []
+    start = 0
+    ende = batch_size
+    src_len = len(source)
+    set_off = time.time()
+    while src_len > ende:
+        print(start)
+        result = result + translator(source[start:ende], k, path=path)
+        start = ende
+        ende += batch_size
+    result = result + translator(source[start:src_len], k, path=path)
+    print("Time taken to predict k={}: {:.2f} sec".format(k, time.time() - set_off))
+
+    return result
+
+
+def translate_sentence(sentence, k=1, one_line=False, path=False):
     """translates sentence using beam search algorithm"""
 
-    model, enc_output, dec_output, h, c = roll_out_encoder(sentence, path=path, name=name)
+    model, enc_output, dec_output, h, c = roll_out_encoder(sentence, path=path)
     first_pred = tf.math.top_k(dec_output, k)
 
     candidate_sentences = []
@@ -230,12 +254,12 @@ def translate_sentence(sentence, k=1, one_line=False, path=False, name=False):
 
 
 # TODO translate with bigger batch_size dont forger remainder sentences
-def beam_decoder(source, k, save=False, path=False, name=False):
+def beam_decoder(source, k, save=False, path=False):
     """finds the best translation scores using the beam decoder."""
     file_txt = []
     set_off = time.time()
     for i, src in enumerate(source):
-        file_txt.append(translate_sentence(src, k, path=path, name=name))
+        file_txt.append(translate_sentence(src, k, path=path))
         if (i % 10) == 0:
             print(i)
     print("Time taken to predict k={}: {:.2f} sec".format(k, time.time() - set_off))
@@ -279,8 +303,9 @@ def print_sentence(pred):
 
 
 # TODO from terminal with runing with differnt model
-def bleu_score(source, target, k=1, n=4, path=False, name=False):
+def bleu_score(source, target, batch_size, k=1, n=4, path=False):
     # plot best result by k
+    set_off = time.time()
     x_achsis = []
     keys_list = dic_tar.get_keys()
     txt_list = []
@@ -288,7 +313,9 @@ def bleu_score(source, target, k=1, n=4, path=False, name=False):
     # run beam decoder and evaluate results
     source = rnn_pred_batch(source)
 
-    pred = beam_decoder(source, k, path=path, name=name)
+    print("Time taken to predict k={}: {:.2f} sec".format(k, time.time() - set_off))
+    pred = fast_beam_search(source, k, batch_size, path=path)
+    # pred = beam_decoder(source, k, path=path)
     # list of texts
     for elem in pred:
         # list of line string
@@ -317,7 +344,7 @@ def bleu_score(source, target, k=1, n=4, path=False, name=False):
     return results, metrics.met_bleu(results, target, n, False)
 
 
-def get_enc_dec_paths(path=False, name=False):
+def get_enc_dec_paths(path=False):
     """returns encoder and decoder path as tuple"""
     if not path:
         enc_path = os.path.join(
@@ -333,24 +360,16 @@ def get_enc_dec_paths(path=False, name=False):
             "decoder.epoch09-loss0.12.hdf5",
         )
     else:
-        enc_path = os.path.join(
-            path,
-            "encoder."+name,
-        )
-        dec_path = os.path.join(
-            path,
-            "decoder."+name,
-        )
+        enc_path = path
+        dec_path = path.replace("encoder", "decoder")
     
     return (enc_path, dec_path)
 
 
 def main():
     """main method"""
-    rnn.init_dics()
-    source = read_from_file(
-        os.path.join(cur_dir, "test_data", "multi30k.dev_subword.de")
-    )
+    rnn.init_dics("_None")
+    source = read_from_file(os.path.join(cur_dir, "test_data", "multi30k.dev.de"))
     target = read_from_file(os.path.join(cur_dir, "test_data", "multi30k.dev.en"))
 
     inputs = [
@@ -366,9 +385,9 @@ def main():
     # inputs = rnn_pred_batch(source)
     # translate_sentence(x, 1, True)
     # beam_decoder(inputs, 1, True)
-    res, bleu = bleu_score(source, target, 1)
+    res, bleu = bleu_score(source, target, 100)
     save_translation(res, bleu)
-
+    # print(fast_beam_search(source, 1, 200))
     # inputs = tf.convert_to_tensor(inputs)
     # print(inputs)
     # f, s = translate_line(1, inputs, 1)
