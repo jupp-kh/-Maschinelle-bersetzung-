@@ -22,178 +22,120 @@ import utility as util
 # TODO python script for running the differnt method.
 
 
-def tokenise_data_bpe(divs, des, train=True):
+def tokenise_data_bpe(divs, des, train=True, ind=""):
     """creates tokenised data files from original text
     des: holds a subdirectory for data files do not add .en or .de
     returns the paths to both saved files"""
-    for i in [".en", ".de"]:
-        if train == True:
-            commands["seq-file" + i], commands["train_tkn_file" + i] = enc.run_bpe(
-                os.path.join(os.curdir, des + i), int(divs)
-            )
-        else:
-            commands["test_tkn_file" + i] = enc.subword_split(
-                os.path.join(os.curdir, des + i), commands["seq-file" + i]
-            )
+
+    if train == True:
+        commands["seq-file-" + ind], commands["train-" + ind] = enc.run_bpe(
+            os.path.join(os.curdir, des), int(divs)
+        )
+    else:
+        commands["test_tkn" + ind] = enc.subword_split(
+            os.path.join(os.curdir, des),
+            commands["seq-file-" + ind],
+            commands["token"],
+        )
 
 
 def overcome_max_line():
     """important for max_line error"""
-    if "--tokenise" in sys.argv:
-        rnn.max_line = (
-            batches.get_max_line(
-                os.path.join(
-                    os.curdir,
-                    commands["--train-data"]
-                    + "_subword_"
-                    + commands["--tokenise"]
-                    + ".de",
-                ),
-                os.path.join(
-                    os.curdir,
-                    commands["--train-data"]
-                    + "_subword_"
-                    + commands["--tokenise"]
-                    + ".en",
-                ),
-            )
-            + 2
+    rnn.max_line = (
+        batches.get_max_line(
+            os.path.join(
+                os.curdir,
+                commands["train-src"],
+            ),
+            os.path.join(
+                os.curdir,
+                commands["train-tar"],
+            ),
         )
-    else:  # take the standard data files from train_data
-        rnn.max_line = (
-            batches.get_max_line(
-                os.path.join(
-                    os.curdir,
-                    commands["--train-data"] + "multi30k" ".de",
-                ),
-                os.path.join(
-                    os.curdir,
-                    commands["--train-data"] + "multi30k" + ".en",
-                ),
-            )
-            + 2
-        )
-    rnn_dec.max_line = rnn.max_line
+        + 2
+    )
 
 
 def create_bi_dicts():
     """store src and trg dictionaries"""
-    if "--tokenise" in sys.argv:
-        read_de = util.read_from_file(
-            os.path.join(
-                os.curdir,
-                commands["--train-data"] + "_subword_" + commands["--tokenise"] + ".de",
-            )
-        )
-        read_en = util.read_from_file(
-            os.path.join(
-                os.curdir,
-                commands["--train-data"] + "_subword_" + commands["--tokenise"] + ".en",
-            )
-        )
-    else:
-        read_de = util.read_from_file(
-            os.path.join(
-                os.curdir,
-                commands["--train-data"] + "multi30k" + ".de",
-            )
-        )
-        read_en = util.read_from_file(
-            os.path.join(
-                os.curdir,
-                commands["--train-data"] + "multi30k" + ".en",
-            )
-        )
-    #
+    read_de = util.read_from_file(os.path.join(os.curdir, commands["train-src"]))
+    read_en = util.read_from_file(os.path.join(os.curdir, commands["train-tar"]))
+
     _, _ = batches.get_word_index(read_de, read_en)
-    if "--tokenise" in sys.argv:
-        dictionary.dic_src.store_dictionary(
-            "source_dictionary_" + commands["--tokenise"]
-        )
-        dictionary.dic_tar.store_dictionary(
-            "target_dictionary_" + commands["--tokenise"]
-        )
-    else:
-        dictionary.dic_src.store_dictionary("source_dictionary_")
-        dictionary.dic_tar.store_dictionary("target_dictionary_")
+
+    dictionary.dic_src.store_dictionary("source_dictionary_" + str(commands["token"]))
+    dictionary.dic_tar.store_dictionary("target_dictionary_" + str(commands["token"]))
 
 
+# change these parameters for tokenising and training paths
 commands = {
-    "--tokenise": None,  # number of bpe operations
-    "--training-path": "train_data/",  # path to training files
-    "--test-path": "test_data/",  # path to test files
-    "--dic-path": "dictionaries/",  # path to dictionaries
-    "--seq-path": "nmt-data/",  # the path where operations are stored
-    "--train-data": "nmt_data/",  # the exact file for training tokenised
-    "--test-data": "nmt_data/",  # the exact file for testing tokenised
+    "token": None,  # number of bpe operations
+    "train-src": "train_data/multi30k.de",  # path to training files
+    "train-tar": "train_data/multi30k.en",  # path to training files
+    "test-src": "test_data/multi30k.dev.de",  # path to test files
+    "test-tar": "test_data/multi30k.dev.en",  # path to test files
+    "dic-src": "dictionaries/source_dictionary",  # path to dictionaries
+    "dic-tar": "dictionaries/target_dictionary",  # path to dictionaries
+    "nmt-path": "nmt-data/",  # the path where operations are stored
 }
 
-
+# method done
 def nmt_preprocessing():
-    args = sys.argv
-    if "--training-path" in args:
-        commands["--training-path"] += args[args.index("--training-path") + 1]
-        commands["--train-data"] += args[args.index("--training-path") + 1]
+    """"""
+    # remove old data files
+    # os.system("rm -r nmt_data/*")
 
-    if "--seq-path" in args:
-        commands["--seq-path"] += args[args.index("--seq-path") + 1]
+    if commands["token"]:
+        # number of bpe operations
+        try:
+            tokenise_data_bpe(commands["token"], commands["train-src"], ind="src")
+            tokenise_data_bpe(commands["token"], commands["train-tar"], ind="tar")
+            tokenise_data_bpe(None, commands["test-src"], train=False, ind="src")
+        except Exception as exc:
+            print("{}".format(exc))
+            print("Error: add all files")
+            exit()
 
-    if "--test-path" in args:
-        commands["--test-path"] += args[args.index("--test-path") + 1]
-        commands["--test-data"] += args[args.index("--test-path") + 1]
+    # updating max_line
+    overcome_max_line()
 
-    if "--dic-path" in args:
-        commands["--dic-path"] += args[args.index("--dic-path") + 1]
-
-    # commands ready and good to go
-    # preprocessing data
-    if "--tokenise" in args:
-        commands["--tokenise"] = args[args.index("--tokenise") + 1]
-
-        # get training data ready
-        if "--training-path" in args:
-            # saves the training data in nmt
-            tokenise_data_bpe(
-                commands["--tokenise"],
-                commands["--training-path"],
-                train=True,
-            )
-        # get test data ready
-        if "--test-path" in args:
-            tokenise_data_bpe(None, commands["--test-path"], train=False)
-    else:
-        commands["--train-data"] = commands["--training-path"]
-
-        if "--test-path" in args:
-            commands["--test-data"] = commands["--test-path"]
-
-    # overcome error from max_line in rnn
-    overcome_max_line()  # call on nmt/"tokenised data file"
-
-    # create dictionary files for training data
-    # initialise both dictionaries
+    # saving dictionaries
     create_bi_dicts()
-
-    # dictionaries done
-    # files noted in commands
-    print(commands)
-
-    # Added parameters in command
-    # 'train_tkn_file.en':
-    # 'train_tkn_file.de':
-    # 'seq-file.de':
-    # 'seq-file.en':
 
 
 def run_nmt():
+    """runs neural machine translation"""
+    # run training with parameters
+    for param in rnn.INFO.keys():
+        rnn.INFO[param] = int(input("Input " + param + ": "))
+
+    print(rnn.INFO)
+    en_path = os.path.join(os.curdir, commands["train-tar"])
+    de_path = os.path.join(os.curdir, commands["train-src"])
+    data = rnn.preprocess_data(en_path, de_path)[1]
+    rnn.train_loop(
+        rnn.INFO["EPOCHS"],
+        data,
+        rnn.INFO["BATCH_SZ"],
+        rnn.INFO["MET_RATE"],
+        rnn.INFO["CP_RATE"],
+        rnn.INFO["CP_START"],
+    )
+
+
+def search():
     pass
 
 
+methods = {"train": run_nmt, "dic_subword": nmt_preprocessing, "search": search}
+
+
 def main():
-    nmt_preprocessing()
+    method = input("which method to run: \n" + "\n".join(methods.keys()) + "\n:")
+    methods[method]()
 
     # ask for hyperparameters
-    run_nmt()
+    # run_nmt()
 
 
 if __name__ == "__main__":
