@@ -21,7 +21,8 @@ import utility as ut
 import recurrent_nn as rnn
 from dictionary import dic_tar, dic_src
 from utility import cur_dir, read_from_file
-import tensorflow_addons as tfa
+
+# import tensorflow_addons as tfa
 from tensorflow.keras.backend import argmax
 from tensorflow.keras.backend import get_value
 
@@ -32,10 +33,10 @@ max_line = 0
 try:
     max_line = (
         batches.get_max_line(
-            os.path.join(cur_dir, "output", "multi30k_subword.de"),
-            os.path.join(cur_dir, "output", "multi30k_subword.en"),
-            #os.path.join(cur_dir, "train_data", "multi30k.de"),
-            #os.path.join(cur_dir, "train_data", "multi30k.en"),
+            os.path.join(cur_dir, "train_data", "multi30k_subword.de"),
+            os.path.join(cur_dir, "train_data", "multi30k_subword.en"),
+            # os.path.join(cur_dir, "train_data", "multi30k.de"),
+            # os.path.join(cur_dir, "train_data", "multi30k.en"),
         )
         + 2
     )
@@ -315,7 +316,7 @@ def bleu_score(source, target, batch_size, k=1, n=4, path=False):
 
     print("Time taken to predict k={}: {:.2f} sec".format(k, time.time() - set_off))
     pred = fast_beam_search(source, k, batch_size, path=path)
-    #pred = beam_decoder(source, k, path=path)
+    # pred = beam_decoder(source, k, path=path)
     # list of texts
     for elem in pred:
         # list of line string
@@ -350,27 +351,29 @@ def get_enc_dec_paths(path=False):
         enc_path = os.path.join(
             cur_dir,
             "rnn_checkpoints",
-            "lstm_self_attention",
-            "encoder.epoch09-loss0.12.hdf5",
+            "encoder.epoch12-loss0.18.hdf5",
         )
         dec_path = os.path.join(
             cur_dir,
             "rnn_checkpoints",
-            "lstm_self_attention",
-            "decoder.epoch09-loss0.12.hdf5",
+            "decoder.epoch12-loss0.18.hdf5",
         )
     else:
         enc_path = path
         dec_path = path.replace("encoder", "decoder")
-    
+
     return (enc_path, dec_path)
 
 
 def main():
     """main method"""
-    rnn.init_dics("_None")
-    source = read_from_file(os.path.join(cur_dir, "test_data", "multi30k.dev.de"))
-    target = read_from_file(os.path.join(cur_dir, "test_data", "multi30k.dev.en"))
+    rnn.init_dics("")
+    source = read_from_file(
+        os.path.join(cur_dir, "test_data", "multi30k.dev_subword.de")
+    )
+    target = read_from_file(
+        os.path.join(cur_dir, "test_data", "multi30k.dev_subword.en")
+    )
 
     inputs = [
         "ein kleines kind steht allein auf einem zerklüfteten felsen .",

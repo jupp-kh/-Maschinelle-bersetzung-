@@ -11,7 +11,8 @@ from tensorflow.python.eager.context import context
 from dictionary import dic_tar, dic_src
 from utility import cur_dir
 import batches
-import tensorflow_addons as tfa
+
+# import tensorflow_addons as tfa
 import recurrent_dec as rnn_dec
 
 
@@ -21,12 +22,12 @@ import recurrent_dec as rnn_dec
 # import config_custom_train as config
 
 INFO = {
-    "EPOCHS": 18,
-    "BATCH_SZ": 100,
+    "EPOCHS": 4,
+    "BATCH_SZ": 200,
     "MET_RATE": 30,
-    "CP_START": 6,
-    "CP_RATE": 6,
-    "UNITS": 500,
+    "CP_START": 1,
+    "CP_RATE": 2,
+    "UNITS": 200,
 }
 
 # TODO automise creating the dicionaries for every traindata und give ist a special name
@@ -85,7 +86,7 @@ class Encoder(tf.keras.Model):
         self.batch_size = batch_size
         self.num_units = num_units
         self.embedding = tf.keras.layers.Embedding(dic_size, em_dim, name="Embedding")
-
+        self.normal = tf.keras.layers.LayerNormalization(axis=2)
         # The GRU RNN layer processes those vectors sequentially.
         self.gru_forward = tf.keras.layers.GRU(
             self.num_units,
@@ -130,6 +131,7 @@ class Encoder(tf.keras.Model):
         """implements call from keras.Model"""
         # specify embedding input and pass in embedding in lstm layer
         em = self.embedding(inputs)
+        em = self.normal(em)
         context, _ = self.self_attention(em, em)
         rnn_context = tf.concat([context, em], axis=-1)
 
@@ -157,7 +159,7 @@ class Decoder(tf.keras.Model):
 
         # Embedding Layer to reduce input size
         self.embedding = tf.keras.layers.Embedding(vocab_size, embedding_dim)
-
+        self.normal = tf.keras.layers.LayerNormalization(axis=2)
         self.lstm = tf.keras.layers.LSTM(
             self.dec_units,
             return_sequences=True,
@@ -189,6 +191,7 @@ class Decoder(tf.keras.Model):
         inp, enc_output = inputs
 
         x = self.embedding(inp)
+        x = self.normal(x)
 
         # process one step with LSTM
         outputs, h, c = self.lstm(x, initial_state=initial_state)
@@ -396,12 +399,12 @@ def preprocess_data(en_path, de_path):
 
 def main():
     """main method"""
-    init_dics("_None")
+    init_dics("")
     # encoder = Encoder(len(dic_src), 200, 200, 200)
     # decoder = Decoder(len(dic_tar), 200, 200, 200)
 
-    en_path = os.path.join(cur_dir, "train_data", "multi30k.en")
-    de_path = os.path.join(cur_dir, "train_data", "multi30k.de")
+    en_path = os.path.join(cur_dir, "train_data", "multi30k_subword.en")
+    de_path = os.path.join(cur_dir, "train_data", "multi30k_subword.de")
     # batch = batches.create_batch_rnn(de_path, en_path)
     epochs, data, sz, met, cp, cp_start = preprocess_data(en_path, de_path)
     model = train_loop(epochs, data, sz, met, cp, cp_start, True)
