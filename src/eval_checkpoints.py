@@ -3,6 +3,7 @@ from argparse import ArgumentParser
 from utility import cur_dir, read_from_file, save_line_as_txt
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.ticker import MaxNLocator
 from matplotlib import rc
 rc('mathtext', default='regular')
 
@@ -48,7 +49,7 @@ for e, d in zip(sorted(files_enc), sorted(files_dec)):
 
 
     enc_path = os.path.join(cp_path, e)
-    res, bleu = rnn_dec.bleu_score(source, target, 200, path=enc_path)
+    res, bleu = rnn_dec.bleu_score(source, target, 100, path=enc_path)
     print("BLEU for Epoch",int(e.split("epoch")[1].split("-")[0]),"is:",bleu)
     dev_bleu[act_epoch] = bleu*100
 
@@ -75,10 +76,13 @@ ax2 = ax.twinx()
 ax2.plot(x, y_dev_bleu, 'x-', color='r', label = 'dev BLEU')
 fig.legend(loc="upper right", bbox_to_anchor=(1,1), bbox_transform=ax.transAxes)
 
+ax.xaxis.set_major_locator(MaxNLocator(integer=True))
 ax.set_xlabel("Epoch")
-ax.set_ylabel('Loss')
+ax.set_ylabel('Loss / Accuracy')
 ax2.set_ylabel('BLEU')
-fig.suptitle('Model - GRU (forward) with Self Attention and Layer Norm\n- Units: 500, BPE: 7000 -', fontsize=12)
+fig.suptitle('Model - GRU (forward) with Self Attention and Layer Norm'\
+    +f'\n- Units: 500, BPE: 7000 -\nBest BLEU Dev: {max(y_dev_bleu):.2f} (Epoch {x[y_dev_bleu.index(max(y_dev_bleu))]})', fontsize=12)
+plt.tight_layout(pad=2.0, rect=(0, 0, 1, 0.9))
 
 img_path = os.path.join(cur_dir ,"plots", cp_dir_name+"_fig1.png")
 
