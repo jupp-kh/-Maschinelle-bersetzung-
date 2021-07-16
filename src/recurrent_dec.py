@@ -33,8 +33,8 @@ max_line = 0
 try:
     max_line = (
         batches.get_max_line(
-            os.path.join(cur_dir, "train_data", "multi30k_subword.de"),
-            os.path.join(cur_dir, "train_data", "multi30k_subword.en"),
+            os.path.join(cur_dir, "nmt_data", "multi30k_subword_7000.de"),
+            os.path.join(cur_dir, "nmt_data", "multi30k_subword_7000.en"),
             # os.path.join(cur_dir, "train_data", "multi30k.de"),
             # os.path.join(cur_dir, "train_data", "multi30k.en"),
         )
@@ -106,7 +106,7 @@ def roll_out_encoder(sentence, search=True, batch_size=1, path=False):
     temp_enc = tf.zeros((batch_size, dec_input.shape[1]), dtype=tf.float32)
     temp_dec = tf.zeros((batch_size, dec_input.shape[1]), dtype=tf.float32)
 
-    enc_output, h, c = test_model.encoder(temp_enc, None)
+    enc_output, state = test_model.encoder(temp_enc, None)
 
     dec_output, _ = test_model.decoder((temp_dec, enc_output), None)
 
@@ -114,10 +114,10 @@ def roll_out_encoder(sentence, search=True, batch_size=1, path=False):
     test_model.decoder.load_weights(dec)
     if search:
         sentence = np.array([sentence])
-        enc_output, h, c = test_model.encoder(sentence, None)
-        dec_output, _ = test_model.decoder((dec_input, enc_output), [h, c])
+        enc_output, state = test_model.encoder(sentence, None)
+        dec_output, _ = test_model.decoder((dec_input, enc_output), [state])
 
-    return test_model, enc_output, dec_output, h, c
+    return test_model, enc_output, dec_output, state
 
 
 def load_encoder(inputs, batch_size, path=False):
@@ -128,8 +128,8 @@ def load_encoder(inputs, batch_size, path=False):
     test_model(temp, None)
 
     test_model.load_weights(enc)
-    outputs, h, c = test_model(inputs, None)
-    return outputs, h, c
+    outputs, state = test_model(inputs, None)
+    return outputs, state
 
 
 def load_decoder(batch_size, path=False):
@@ -145,13 +145,13 @@ def load_decoder(batch_size, path=False):
 
 def translator(sentence, k=1, path=False):
     batch_size = len(sentence)
-    enc_outputs, enc_h, enc_c = load_encoder(sentence, batch_size, path=path)
+    enc_outputs, enc_state = load_encoder(sentence, batch_size, path=path)
     decoder = load_decoder(1, path=path)
     result = []
-    for enc_output, h, c in zip(enc_outputs, enc_h, enc_c):
+    for enc_output, state in zip(enc_outputs, enc_state):
         dec_input = [[dic_src.bi_dict["<s>"]] + [0 for _ in range(max_line - 1)]]
         dec_input = np.array(dec_input)
-        dec_output, _ = decoder((dec_input, enc_output), [[h], [c]])
+        dec_output, _ = decoder((dec_input, enc_output), [[state]])
         first_pred = tf.math.top_k(dec_output, k)
         candidate_sentences = []
         for i in range(k):
@@ -173,7 +173,7 @@ def translator(sentence, k=1, path=False):
                 pre_sentence = tf.keras.preprocessing.sequence.pad_sequences(
                     [pre_pred_word], maxlen=max_line, value=0, padding="post"
                 )
-                pred_word, _ = decoder((pre_sentence, enc_output), [[h], [c]])
+                pred_word, _ = decoder((pre_sentence, enc_output), [[state]])
 
                 k_best = tf.math.top_k(pred_word, k=k)
 
@@ -261,7 +261,7 @@ def beam_decoder(source, k, save=False, path=False):
     set_off = time.time()
     for i, src in enumerate(source):
         file_txt.append(translate_sentence(src, k, path=path))
-        if (i % 10) == 0:
+        if (i % 100) == 0:
             print(i)
     print("Time taken to predict k={}: {:.2f} sec".format(k, time.time() - set_off))
     # TODO add the blue metrik and print it.

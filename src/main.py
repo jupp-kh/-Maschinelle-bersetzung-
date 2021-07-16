@@ -69,7 +69,7 @@ def create_bi_dicts():
 
 # change these parameters for tokenising and training paths
 commands = {
-    "token": None,  # number of bpe operations
+    "token": 7000,  # number of bpe operations
     "train-src": "train_data/multi30k.de",  # path to training files
     "train-tar": "train_data/multi30k.en",  # path to training files
     "test-src": "test_data/multi30k.dev.de",  # path to test files
