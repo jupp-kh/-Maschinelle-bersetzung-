@@ -49,7 +49,7 @@ for e, d in zip(sorted(files_enc), sorted(files_dec)):
 
     enc_path = os.path.join(cp_path, e)
     res, bleu = rnn_dec.bleu_score(source, target, 200, path=enc_path)
-    rnn_dec.save_transltaion(res, bleu)
+    rnn_dec.save_translation(res, bleu)
     print("BLEU for Epoch", int(e.split("epoch")[1].split("-")[0]), "is:", bleu)
     dev_bleu[act_epoch] = bleu
 

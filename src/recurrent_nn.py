@@ -22,12 +22,13 @@ import recurrent_dec as rnn_dec
 # import config_custom_train as config
 
 INFO = {
-    "EPOCHS": 10,
-    "BATCH_SZ": 100,
+    "EPOCHS": 14,
+    "BATCH_SZ": 500,
     "MET_RATE": 30,
     "CP_START": 4,
     "CP_RATE": 2,
-    "UNITS": 786,
+    "UNITS": 500,
+    "Embedding": 200,
 }
 
 # TODO automise creating the dicionaries for every traindata und give ist a special name
@@ -43,7 +44,7 @@ try:
         + 2
     )
 except Exception as exx:
-    print("Issue with max_line {}".format(exx))
+    print("Issue with max_line")
 
 
 class BahdanauAttention(tf.keras.layers.Layer):
@@ -88,21 +89,6 @@ class Encoder(tf.keras.Model):
         self.embedding = tf.keras.layers.Embedding(dic_size, em_dim, name="Embedding")
         self.normal = tf.keras.layers.LayerNormalization(axis=2)
         # The GRU RNN layer processes those vectors sequentially.
-        self.gru_forward = tf.keras.layers.GRU(
-            self.num_units,
-            # Return the sequence and state
-            return_sequences=True,
-            return_state=True,
-            recurrent_initializer="glorot_uniform",
-        )
-        self.gru_backward = tf.keras.layers.GRU(
-            self.num_units,
-            # Return the sequence and state
-            return_sequences=True,
-            return_state=True,
-            go_backwards=True,
-            recurrent_initializer="glorot_uniform",
-        )
 
         self.lstm_forward = tf.keras.layers.LSTM(
             self.num_units,
@@ -121,9 +107,6 @@ class Encoder(tf.keras.Model):
 
         self.bidirect_lstm = tf.keras.layers.Bidirectional(
             self.lstm_forward, backward_layer=self.lstm_backward, merge_mode="sum"
-        )
-        self.bidirect_gru = tf.keras.layers.Bidirectional(
-            self.gru_forward, backward_layer=self.gru_backward, merge_mode="sum"
         )
         self.self_attention = BahdanauAttention(self.num_units)
 
@@ -253,7 +236,7 @@ class Translator(tf.keras.Model):
 
 
 # init dictionaries
-def init_dics(bpe=""):
+def init_dics(bpe="_40"):
     """read learned dictionaries for source and target"""
     dic_src.get_stored(os.path.join(cur_dir, "dictionaries", "source_dictionary" + bpe))
     dic_tar.get_stored(os.path.join(cur_dir, "dictionaries", "target_dictionary" + bpe))
@@ -300,7 +283,9 @@ def train_loop(epochs, data, batch_size, metric_rate, cp_rate, cp_start, load=Fa
     if load:
         model, _, _, _, _ = rnn_dec.roll_out_encoder(None, False, batch_size)
     else:
-        model = Translator(len(dic_tar), len(dic_src), 200, INFO["UNITS"], batch_size)
+        model = Translator(
+            len(dic_tar), len(dic_src), INFO["Embedding"], INFO["UNITS"], batch_size
+        )
         # temp = tf.zeros((batch_size, 47))
 
     # tensorboard summary destination
@@ -310,9 +295,11 @@ def train_loop(epochs, data, batch_size, metric_rate, cp_rate, cp_start, load=Fa
     tb_writer = tf.summary.create_file_writer(logdir=tb_log_dir)
 
     # set cp directory rrn_checkpoints
-    CHECKPOINT_DIR = os.path.join(
-        cur_dir, "rnn_checkpoints", "lstm_self_attention_786_bpe=7000"
-    )
+    CHECKPOINT_DIR = os.path.join(cur_dir, "cp_dir")
+    INFO["CP_DIR"] = CHECKPOINT_DIR
+    # make sure it exists
+    if not os.path.exists(CHECKPOINT_DIR):
+        os.makedirs(CHECKPOINT_DIR)
 
     for epoch in range(epochs):
         loss = 0
@@ -321,6 +308,8 @@ def train_loop(epochs, data, batch_size, metric_rate, cp_rate, cp_start, load=Fa
 
         for (i, batch) in enumerate(data):
             # batch loss and epoch avr loss
+            if i > 10:
+                tf.keras.backend.set_value(model.optimizer.learning_rate, 0.001)
             b_loss = model.train_step(batch, hidden)
             loss += b_loss
 
@@ -399,7 +388,7 @@ def preprocess_data(en_path, de_path):
 
 def main():
     """main method"""
-    init_dics("")
+    init_dics()
     # encoder = Encoder(len(dic_src), 200, 200, 200)
     # decoder = Decoder(len(dic_tar), 200, 200, 200)
 

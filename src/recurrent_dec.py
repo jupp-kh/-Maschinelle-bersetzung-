@@ -41,7 +41,7 @@ try:
         + 2
     )
 except Exception as exx:
-    print("Issue with max_line {}".format(exx))
+    print("Issue with max_line")
 
 
 def save_translation(fd, bleu_score):
@@ -99,7 +99,7 @@ def roll_out_encoder(sentence, search=True, batch_size=1, path=False):
     """builds and returns a model from model's path"""
     enc, dec = get_enc_dec_paths(path=path)
     test_model = rnn.Translator(
-        len(dic_tar), len(dic_src), 200, rnn.INFO["UNITS"], batch_size
+        len(dic_tar), len(dic_src), rnn.INFO["Embedding"], rnn.INFO["UNITS"], batch_size
     )
     dec_input = [[dic_src.bi_dict["<s>"]] + [0 for _ in range(max_line - 1)]]
     dec_input = np.array(dec_input)
@@ -123,7 +123,9 @@ def roll_out_encoder(sentence, search=True, batch_size=1, path=False):
 def load_encoder(inputs, batch_size, path=False):
 
     enc, dec = get_enc_dec_paths(path=path)
-    test_model = rnn.Encoder(len(dic_src), 200, rnn.INFO["UNITS"], batch_size)
+    test_model = rnn.Encoder(
+        len(dic_src), rnn.INFO["Embedding"], rnn.INFO["UNITS"], batch_size
+    )
     temp = tf.zeros((batch_size, max_line), dtype=tf.float32)
     test_model(temp, None)
 
@@ -134,7 +136,9 @@ def load_encoder(inputs, batch_size, path=False):
 
 def load_decoder(batch_size, path=False):
     enc, dec = get_enc_dec_paths(path=path)
-    test_model = rnn.Decoder(len(dic_tar), 200, rnn.INFO["UNITS"], batch_size)
+    test_model = rnn.Decoder(
+        len(dic_tar), rnn.INFO["Embedding"], rnn.INFO["UNITS"], batch_size
+    )
     temp = tf.zeros((batch_size, max_line), dtype=tf.float32)
     enc_temp = tf.zeros((batch_size, max_line, rnn.INFO["UNITS"]), dtype=tf.float32)
 
@@ -390,7 +394,7 @@ def main():
     # beam_decoder(inputs, 1, True)
     res, bleu = bleu_score(source, target, 100)
     save_translation(res, bleu)
-    # print(fast_beam_search(source, 1, 200))
+    # print(fast_beam_search(source, 1, rnn.INFO["Embedding"]))
     # inputs = tf.convert_to_tensor(inputs)
     # print(inputs)
     # f, s = translate_line(1, inputs, 1)
