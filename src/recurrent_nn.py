@@ -8,6 +8,7 @@ import os
 import tensorflow as tf
 from tensorflow._api.v2 import summary
 from tensorflow.python.eager.context import context
+from tensorflow.python.ops.math_ops import argmax
 from dictionary import dic_tar, dic_src
 from utility import cur_dir
 import batches
@@ -236,7 +237,7 @@ class Translator(tf.keras.Model):
 
 
 # init dictionaries
-def init_dics(bpe="_40"):
+def init_dics(bpe=""):
     """read learned dictionaries for source and target"""
     dic_src.get_stored(os.path.join(cur_dir, "dictionaries", "source_dictionary" + bpe))
     dic_tar.get_stored(os.path.join(cur_dir, "dictionaries", "target_dictionary" + bpe))
@@ -267,11 +268,19 @@ def perplexity(loss):
 
 def accuracy(real, pred):
     """computes and returns accuracy"""
-    # top 1 from pred
-    real = tf.one_hot(real, depth=len(dic_tar.bi_dict))
+    # top result from pred comparison
+    accs = tf.math.equal(real, tf.math.argmax(pred, axis=2))
 
-    # call accuracy
-    return tf.keras.metrics.Accuracy()(real, pred)
+    # masking at inputs == 0
+    # falsify at real == 0
+    mask = tf.math.logical_not(real == 0)
+    accs = tf.math.logical_and(mask, accs)
+
+    # cast both to float
+    mask, accs = tf.cast(accs, dtype=tf.float32), tf.cast(mask, dtype=tf.float32)
+
+    # return masked accuracy
+    return tf.reduce_sum(accs) / tf.reduce_sum(mask)
 
 
 # epochs, batch_size, metrics_rate and cp_rate should be flexible parameters
