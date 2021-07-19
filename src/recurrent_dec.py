@@ -16,7 +16,7 @@ import random
 from tensorflow.keras import metrics
 import batches
 import metrics
-from encoder import revert_bpe
+from encoder import revert_bpe, subword_split
 import utility as ut
 import recurrent_nn as rnn
 from dictionary import dic_tar, dic_src
@@ -378,6 +378,12 @@ def main():
     target = read_from_file(
         os.path.join(cur_dir, "test_data", "multi30k.dev_subword.en")
     )
+
+    user_input = input("Insert src file name: ")
+    if not user_input == "":
+        splt = os.path.join(cur_dir, "output", "multi30k_op_sequence_7000.de")
+        source = os.path.join(cur_dir, "nmt_data", user_input)
+        source = subword_split(source, splt, 7000)
 
     inputs = [
         "ein kleines kind steht allein auf einem zerklüfteten felsen .",
