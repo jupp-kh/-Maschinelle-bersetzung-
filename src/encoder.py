@@ -1,3 +1,4 @@
+from typing import Sequence
 import dictionary
 import sys, time, threading
 import utility
@@ -182,9 +183,15 @@ def subword_split(text_file, sequence_file):
     utility.save_as_txt(file_des, text)
 
 
-def revert_bpe(file):
+def revert_bpe(file, line=False):
     """undos the transformation done to file by BPE"""
     # join all lines into one string separated by \n
+    if line:
+        file = file.replace("<s> ", "")
+        file = file.replace("</s>", "")
+        file = file.replace("@@ ", "")
+        return file
+
     reader = "\n".join(utility.read_from_file(file))
 
     # write original text back out > file
@@ -220,13 +227,16 @@ def run_bpe(*oper):
 
 def rename_me():
     """reverts bpe for files in predictions"""
-    for i in range(5):
-        revert_bpe(
-            os.path.join(
-                os.curdir, "predictions", "beam_k=10_prediction" + str(i) + ".de"
-            )
-        )
+    # for i in range(5):
+    #     revert_bpe(
+    #         os.path.join(
+    #             os.curdir, "predictions", "beam_k=10_prediction" + str(i) + ".de"
+    #         )
+    #     )
     # run_bpe(7000)
+    devpath = os.path.join(utility.cur_dir, "test_data", "test_2016_flickr.de.txt")
+    sequencepath = os.path.join(utility.cur_dir, "nmt_data", "multi30k_oper_7000.de")
+    subword_split(devpath, sequencepath, 10)
 
 
 if __name__ == "__main__":

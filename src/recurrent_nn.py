@@ -20,6 +20,18 @@ import recurrent_dec as rnn_dec
 # import config file for hyperparameter search space
 # import config_custom_train as config
 
+<<<<<<< Updated upstream
+=======
+INFO = {
+    "EPOCHS": 4,
+    "BATCH_SZ": 150,
+    "MET_RATE": 30,
+    "CP_START": 1,
+    "CP_RATE": 1,
+    "UNITS": 500,
+}
+
+>>>>>>> Stashed changes
 # TODO automise creating the dicionaries for every traindata und give ist a special name
 
 # FIXME pass in path as flags
@@ -69,9 +81,21 @@ class BahdanauAttention(tf.keras.layers.Layer):
 class Encoder(tf.keras.Model):
     def __init__(self, dic_size, em_dim, num_units, batch_size, **kwargs):
         super(Encoder, self).__init__(**kwargs)
+        self.train = False
         self.batch_size = batch_size
         self.num_units = num_units
+<<<<<<< Updated upstream
         self.embedding = tf.keras.layers.Embedding(dic_size, em_dim, name="Embedding")
+=======
+        self.embedding = tf.keras.layers.Embedding(dic_size, em_dim)
+        self.drop_1 = tf.keras.layers.Dropout(0.2)
+        self.drop_2 = tf.keras.layers.Dropout(0.2)
+        self.drop_3 = tf.keras.layers.Dropout(0.2)
+        self.normal = tf.keras.layers.LayerNormalization(axis=2)
+        self.batch_nor1 = tf.keras.layers.BatchNormalization(axis=1)
+        self.batch_nor2 = tf.keras.layers.BatchNormalization(axis=1)
+        self.batch_nor3 = tf.keras.layers.BatchNormalization(axis=1)
+>>>>>>> Stashed changes
 
         # The GRU RNN layer processes those vectors sequentially.
         self.gru_forward = tf.keras.layers.GRU(
@@ -89,38 +113,40 @@ class Encoder(tf.keras.Model):
             go_backwards=True,
             recurrent_initializer="glorot_uniform",
         )
-
-        self.lstm_forward = tf.keras.layers.LSTM(
-            self.num_units,
-            return_sequences=True,
-            return_state=True,
-            name="LSTM_forward",
-        )
-
-        self.lstm_backward = tf.keras.layers.LSTM(
-            self.num_units,
-            return_sequences=True,
-            return_state=True,
-            go_backwards=True,
-            name="LSTM_backword",
-        )
-
-        self.bidirect_lstm = tf.keras.layers.Bidirectional(
-            self.lstm_forward, backward_layer=self.lstm_backward, merge_mode="sum"
-        )
+        # define fully connected layer
+        self.fc = tf.keras.layers.Dense(num_units)
         self.bidirect_gru = tf.keras.layers.Bidirectional(
             self.gru_forward, backward_layer=self.gru_backward, merge_mode="sum"
         )
+
         self.self_attention = BahdanauAttention(self.num_units)
 
     def call(self, inputs, hidden=None):
         """implements call from keras.Model"""
         # specify embedding input and pass in embedding in lstm layer
         em = self.embedding(inputs)
+<<<<<<< Updated upstream
+=======
+        em = self.normal(em)
+        em = self.batch_nor1(em)
+        em = self.drop_1(em, self.train)
+>>>>>>> Stashed changes
         context, _ = self.self_attention(em, em)
         rnn_context = tf.concat([context, em], axis=-1)
+        em = self.drop_2(rnn_context, training=self.train)
 
+        output, _, state = self.bidirect_gru(em, initial_state=hidden)
+        output = self.drop_3(output, training=self.train)
+        # output = self.batch_nor2(output)
+        output = self.fc(output)
+        # output = self.batch_nor3(output)
+        # gru naked
+        # output, state = self.gru_backward(em)
+
+<<<<<<< Updated upstream
         output, _, state = self.bidirect_gru(rnn_context, initial_state=hidden)
+=======
+>>>>>>> Stashed changes
         return output, state
 
     def initialize_hidden_state(self):
@@ -141,13 +167,29 @@ class Decoder(tf.keras.Model):
         self, vocab_size, embedding_dim, dec_units, batch_sz, attention_type="luong"
     ):
         super(Decoder, self).__init__()
+        self.train = False
         self.batch_sz = batch_sz
         self.dec_units = dec_units
         self.attention_type = attention_type
+<<<<<<< Updated upstream
 
         # Embedding Layer to reduce input size
         self.embedding = tf.keras.layers.Embedding(vocab_size, embedding_dim)
 
+=======
+        self.normal = tf.keras.layers.LayerNormalization(axis=2)
+        self.batch_nor1 = tf.keras.layers.BatchNormalization(axis=2)
+        self.batch_nor2 = tf.keras.layers.BatchNormalization(axis=2)
+        self.batch_nor3 = tf.keras.layers.BatchNormalization(axis=2)
+        # Embedding Layer to reduce input size
+        self.embedding = tf.keras.layers.Embedding(
+            vocab_size, embedding_dim, mask_zero=True
+        )
+        self.drop_1 = tf.keras.layers.Dropout(0.2)
+        self.drop_2 = tf.keras.layers.Dropout(0.2)
+        self.drop_3 = tf.keras.layers.Dropout(0.2)
+        self.drop_4 = tf.keras.layers.Dropout(0.2)
+>>>>>>> Stashed changes
         # Define the fundamental cell for decoder recurrent structure
         self.gru = tf.keras.layers.GRU(
             self.dec_units,
@@ -160,9 +202,7 @@ class Decoder(tf.keras.Model):
         self.attention_mechanism = BahdanauAttention(self.dec_units)
 
         # combine the rnn output and the context vector to generate attention vector
-        self.vector = tf.keras.layers.Dense(
-            self.dec_units, activation="tanh", use_bias=False
-        )
+        self.vector = tf.keras.layers.Dense(self.dec_units, activation="tanh")
 
         # Final Dense layer on which softmax will be applied
         self.softmax = tf.keras.layers.Dense(vocab_size, activation="softmax")
@@ -173,10 +213,21 @@ class Decoder(tf.keras.Model):
         inp, enc_output = inputs
 
         x = self.embedding(inp)
+<<<<<<< Updated upstream
 
         # process one step with LSTM
         outputs, state = self.gru(x, initial_state=initial_state)
 
+=======
+        x = self.normal(x)
+        x = self.batch_nor1(x)
+        x = self.drop_2(x, training=self.train)
+
+        # process one step with LSTM
+        outputs, state = self.gru(x, initial_state=initial_state)
+        outputs = self.drop_3(outputs, training=self.train)
+        # outputs = self.batch_nor2(outputs)
+>>>>>>> Stashed changes
         # use the outputs variable for the attention over encoder's output
         # dec_query: output from decoder's lstm layer, enc_values: output from encoder's lstm layer
         context, weights = self.attention_mechanism(
@@ -188,6 +239,8 @@ class Decoder(tf.keras.Model):
         rnn_context = tf.concat([context, outputs], axis=-1)
         attention_vector = self.vector(rnn_context)
 
+        attention_vector = self.drop_1(attention_vector, training=self.train)
+        # attention_vector = self.batch_nor3(attention_vector)
         # final output layer - applying softmax
         outputs = self.softmax(attention_vector)
 
@@ -218,8 +271,12 @@ class Translator(tf.keras.Model):
             real = targ[:, 1:]  # ignore <s> token
 
             # pass input into decoder
+<<<<<<< Updated upstream
             dec_output, weights, state = self.decoder((dec_input, enc_output), None)
             # print(real.shape, dec_output.shape)
+=======
+            dec_output, weights, state = self.decoder((dec_input, enc_output), state)
+>>>>>>> Stashed changes
 
             # targ represent the real values whilst dec_output is a softmax layer
             loss = categorical_loss(real, dec_output)
@@ -283,7 +340,8 @@ def train_loop(epochs, data, batch_size, metric_rate, cp_rate, cp_start, load=Fa
     else:
         model = Translator(len(dic_tar), len(dic_src), 200, 200, batch_size)
         # temp = tf.zeros((batch_size, 47))
-
+    model.encoder.train = True
+    model.decoder.train = True
     # tensorboard summary destination
     tb_log_dir = os.path.join(
         "rnn_logs", datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -291,8 +349,13 @@ def train_loop(epochs, data, batch_size, metric_rate, cp_rate, cp_start, load=Fa
     tb_writer = tf.summary.create_file_writer(logdir=tb_log_dir)
 
     # set cp directory rrn_checkpoints
+<<<<<<< Updated upstream
     CHECKPOINT_DIR = os.path.join(cur_dir, "rnn_checkpoints")
 
+=======
+    CHECKPOINT_DIR = os.path.join(cur_dir, "rnn_checkpoints", "gru_700")
+    # tf.keras.backend.set_value(model.optimizer.learning_rate, 0.001)
+>>>>>>> Stashed changes
     for epoch in range(epochs):
         loss = 0
         set_off = time.time()
